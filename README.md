@@ -1,41 +1,58 @@
 # Jaque Mate
 
-Ajedrez para jugar online con amigos, contra la compu (5 niveles) o entre dos personas en el mismo teléfono. Lleva un marcador por rival y se instala en la pantalla de inicio del teléfono como una app.
+Plataforma de ajedrez para jugar, aprender y practicar, donde cada partida alimenta el entrenamiento:
+**jugar → analizar → detectar errores → practicar → aprender → volver a jugar**.
 
-- Página estática: funciona en GitHub Pages, sin servidor propio.
-- Online y marcador con Firebase Realtime Database (plan gratuito).
-- Cuentas simples: nombre + PIN de 4 números.
+Proyecto universitario hecho con **React + TypeScript + Vite**, publicado en GitHub Pages, con Firebase para cuentas y partidas online.
+
+## Estado
+
+Etapa 1 de 9 (base modular y navegación). Ver el documento de diseño para el plan completo.
+
+- Navegación: Inicio, Jugar, Aprender, Entrenar, Problemas, Partidas, Perfil (barra inferior en celular, lateral en computador).
+- Bienvenida con dos preguntas que arman el plan inicial.
+- Jugar: partida rápida, 5 bots (400 a 2000), ritmos 1+0 a 15+10 y personalizado, dos personas en el mismo teléfono, amigo online por código.
+- Tablero: tocar o arrastrar, jugadas legales, última jugada, jaque, coronación, enroque, captura al paso, tablas por repetición/50 jugadas/material, reloj con incremento.
+- Cuentas con nombre + PIN y marcador por rival.
 
 ## Estructura
 
 ```
-index.html           pantallas (entrar, menú, sala, partida)
-styles.css           diseño
-app.js               lógica del juego, modos y conexión online
-engine.js            reglas del ajedrez y la compu (sin dependencias)
-engine-worker.js     corre la compu en segundo plano para que no se trabe la pantalla
-firebase-config.js   datos del proyecto de Firebase
-database.rules.json  reglas que se pegan en Firebase
-sw.js, manifest.webmanifest, icons/   para instalarla en el teléfono
+src/
+  engine/       motor de ajedrez (sin interfaz) + Web Worker + niveles de bot
+  chess/        partida, notación (FEN, SAN, UCI) y reloj
+  components/   ChessBoard, PlayerBar, MoveList, GameView, Layout, ...
+  pages/        una vista por pantalla
+  hooks/        lógica de partida local
+  database/     sesión, cuentas, Firebase y salas online
+  styles/       tokens, base, componentes y páginas
+  training/ lessons/ problems/ profile/ statistics/   (próximas etapas)
+tools/          scripts de Node: perft, generador de problemas
+tests/          prueba online de punta a punta con Firebase simulado
+docs/           compilación publicada en GitHub Pages
 ```
 
-## Configurar Firebase (una vez)
+## Comandos
 
-1. console.firebase.google.com → Crear proyecto.
-2. Compilación → Realtime Database → Crear base de datos.
-3. Pestaña **Reglas** → pega el contenido de `database.rules.json` → Publicar.
-4. Configuración del proyecto → Tus apps → Web → copia `firebaseConfig` dentro de `firebase-config.js`.
+```bash
+npm install
+npm run dev          # desarrollo en http://localhost:5173
+npm run build        # compila a docs/ (lo que publica GitHub Pages)
+npm test             # perft: verifica el generador de jugadas
+npm run test:online  # dos navegadores juegan una partida online (Firebase simulado)
+```
 
-## Publicar en GitHub Pages
+## Configurar Firebase
 
-Settings → Pages → Source: **Deploy from a branch** → Branch: `main` / `(root)` → Save.
-Al par de minutos queda en `https://<usuario>.github.io/ajedrez/`.
+1. console.firebase.google.com → Crear proyecto → Realtime Database.
+2. Pestaña **Reglas** → pegar `database.rules.json` → Publicar.
+3. Configuración del proyecto → Tus apps → Web → copiar `firebaseConfig` en `src/database/firebase-config.ts`.
+4. `npm run build` y subir.
 
-## Instalar en el teléfono
+## Publicar
 
-- iPhone (Safari): botón Compartir → **Agregar a inicio**.
-- Android (Chrome): menú ⋮ → **Instalar app** o **Agregar a la pantalla principal**.
+Settings → Pages → Branch `main`, carpeta **/docs** → Save.
 
 ## Seguridad
 
-Pensado para jugar entre amigos: el PIN evita que alguien use tu nombre por descuido, pero no es una protección fuerte (no hay servidor propio que lo verifique).
+Pensado para jugar entre amigos: el PIN evita que alguien use tu nombre por descuido, pero no es una protección fuerte.

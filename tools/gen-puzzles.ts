@@ -1,6 +1,8 @@
-// Genera problemas jugando partidas motor-contra-motor con errores y buscando posiciones con una única solución.
-const {E,fen2pos,pos2fen,code,rootScores,findMove,isMate}=require('./lib');
-const fs=require('fs');
+// Genera problemas jugando partidas motor-contra-motor con errores y buscando posiciones con una sola solución.
+// Uso: node tools/gen-puzzles.ts <cantidad> <archivo.json>
+// @ts-nocheck
+import * as fs from 'node:fs';
+import { E, parseFen as fen2pos, toFen as pos2fen, rootScores } from './lib.ts';
 const START='rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 const target=+process.argv[2]||200, out=process.argv[3]||'puzzles-raw.json';
 const found=[],seen=new Set();let games=0;const t0=Date.now();
@@ -20,7 +22,7 @@ while(found.length<target&&Date.now()-t0<540000){
           if((n===1&&acc.length<=2)||(n===2&&acc.length===1)||(n===3&&acc.length===1&&plies===5))
             pz={type:'mate',n,acc:acc.map(x=>x.c)};
         } else if(second&&best.s>=250&&best.s<2000&&second.s<=Math.min(100,best.s-280)){
-          const recapture=prev&&prev.c&&prev.t===best.m.t;
+          const recapture=!!(prev&&prev.c&&prev.t===best.m.t);
           if(!recapture){
             // confirma a más profundidad
             const rs5=rootScores(P,4);

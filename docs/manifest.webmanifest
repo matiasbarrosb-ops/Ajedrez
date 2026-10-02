@@ -1,7 +1,7 @@
 {
   "name": "Jaque Mate",
   "short_name": "Jaque Mate",
-  "description": "Ajedrez online con amigos, contra la compu o en el mismo teléfono.",
+  "description": "Juega, aprende y practica ajedrez.",
   "lang": "es",
   "start_url": "./",
   "scope": "./",

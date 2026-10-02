@@ -1,0 +1,12 @@
+/* Diseño: tablero protagonista, verde de tablero como acento, fondos verde-carbón. Una sola apariencia oscura. */
+:root {
+  --bg: #1b1f1a; --panel: #252a23; --panel-2: #30362d; --line: #3b4237;
+  --fg: #eef0e8; --muted: #9ba393; --accent: #86b84a; --accent-ink: #142009; --accent-sh: #5a8a2a;
+  --danger: #e2563f; --gold: #e3b341; --info: #6aa3c9;
+  --sq-light: #ecedd1; --sq-dark: #74955a; --hl-light: #f5f683; --hl-dark: #b9ca43; --hint-light: #a9d3f5; --hint-dark: #6aa3c9;
+  --f-ui: "Rubik", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-pc: "Noto Sans Symbols 2", "Segoe UI Symbol", "DejaVu Sans", "Apple Symbols", sans-serif;
+  --r-sm: 8px; --r-md: 12px; --r-lg: 16px;
+  --tab-h: 64px;
+  color-scheme: dark;
+}
