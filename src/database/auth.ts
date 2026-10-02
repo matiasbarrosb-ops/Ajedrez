@@ -33,6 +33,7 @@ export async function signIn(rawName: string, pin: string, register: boolean): P
     user = { uid, name: snap.val().name, pinHash };
   }
   setUser(user);
+  void import('../profile/progress.ts').then(m => m.syncProgressFromCloud());
   return user;
 }
 
@@ -47,5 +48,6 @@ export async function verifySavedUser(): Promise<void> {
   try {
     const s = await fb.get(fb.r(`users/${u.uid}`));
     if (!s.exists() || s.val().pinHash !== u.pinHash) setUser(null);
+    else void import('../profile/progress.ts').then(m => m.syncProgressFromCloud());
   } catch { /* sin conexión: se mantiene */ }
 }

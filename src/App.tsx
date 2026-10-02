@@ -6,7 +6,11 @@ import { HomePage } from './pages/HomePage.tsx';
 import { PlayPage } from './pages/PlayPage.tsx';
 import { GamePage } from './pages/GamePage.tsx';
 import { RoomPage } from './pages/RoomPage.tsx';
-import { LearnPage, TrainPage, PuzzlesPage, GamesPage } from './pages/SectionPages.tsx';
+import { LearnPage } from './pages/LearnPage.tsx';
+import { LessonPage } from './pages/LessonPage.tsx';
+import { PuzzlesPage, PuzzlePage } from './pages/PuzzlesPage.tsx';
+import { TrainPage } from './pages/TrainPage.tsx';
+import { GamesPage, GameViewerPage } from './pages/GamesPage.tsx';
 import { ProfilePage } from './pages/ProfilePage.tsx';
 import { WelcomePage } from './pages/WelcomePage.tsx';
 import { LoginPage } from './pages/LoginPage.tsx';
@@ -37,7 +41,10 @@ export default function App() {
           <Route path="/partida" element={<GamePage />} />
           <Route path="/sala/:code" element={<RoomPage />} />
           <Route path="/aprender" element={<LearnPage />} />
+          <Route path="/leccion/:id" element={<LessonPage />} />
           <Route path="/entrenar" element={<TrainPage />} />
+          <Route path="/problema" element={<PuzzlePage />} />
+          <Route path="/partidas/:id" element={<GameViewerPage />} />
           <Route path="/problemas" element={<PuzzlesPage />} />
           <Route path="/partidas" element={<GamesPage />} />
           <Route path="/perfil" element={<ProfilePage />} />

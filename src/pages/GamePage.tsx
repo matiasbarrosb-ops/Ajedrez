@@ -8,6 +8,9 @@ import { loadSavedLocal, startLocalGame, useLocalGame } from '../hooks/useLocalG
 import { useStore } from '../database/store.ts';
 import { sessionStore } from '../database/session.ts';
 import { bumpRecord } from '../database/online.ts';
+import { recordGame } from '../profile/progress.ts';
+import { REASON_TEXT as RT } from '../chess/game.ts';
+import { loadSavedLocal as loadSaved } from '../hooks/useLocalGame.ts';
 
 const EMPTY: Move[] = [];
 
@@ -35,11 +38,19 @@ function LocalGame({ onRestart }: { onRestart: () => void }) {
   useEffect(() => {
     if (!result) return;
     setOverSeen(false);
+    if (!recorded.current) {
+      const human = cfg.mode === 'bot' ? cfg.human : 'w';
+      recordGame({
+        date: Date.now(), mode: cfg.mode, opponent: cfg.mode === 'bot' ? g.bot.name : 'Dos jugadores', opponentRating: cfg.mode === 'bot' ? g.bot.rating : undefined,
+        color: human, result: !result.winner ? 'draw' : result.winner === human ? 'win' : 'loss', reason: RT[result.reason], moves: game.codes, tc: cfg.tc,
+        durationMs: Date.now() - (loadSaved()?.startedAt ?? Date.now())
+      });
+    }
     if (!recorded.current && cfg.mode === 'bot' && user && game.hist.length >= 2) {
-      recorded.current = true;
       const res = !result.winner ? 'd' : result.winner === cfg.human ? 'w' : 'l';
       void bumpRecord(user.uid, `~bot${cfg.botId}`, `${g.bot.name} · ${g.bot.rating}`, res);
     }
+    recorded.current = true;
   }, [result]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const players: Record<Color, PlayerInfo> = cfg.mode === 'bot'

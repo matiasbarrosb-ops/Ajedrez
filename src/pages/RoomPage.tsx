@@ -16,6 +16,8 @@ import {
   roomClock, roomLink, roomMoves, sendMove, setPresence, watchRecord, watchRoom, type RecordEntry, type Room
 } from '../database/online.ts';
 import { serverNow } from '../database/firebase.ts';
+import { recordGame } from '../profile/progress.ts';
+import { REASON_TEXT as RT } from '../chess/game.ts';
 
 const EMPTY: Move[] = [];
 
@@ -102,7 +104,20 @@ function RoomView({ code, user }: { code: string; user: User }) {
 
   // al terminar, mostrar el resultado una vez
   const over = room?.status === 'over';
-  useEffect(() => { if (over) { setOverSeen(false); } }, [over]);
+  const savedGame = useRef(false);
+  useEffect(() => {
+    if (!over || !room || !myColor || !room.result) return;
+    setOverSeen(false);
+    if (savedGame.current) return;
+    savedGame.current = true;
+    const opp = room.players[myColor === 'w' ? 'b' : 'w'];
+    const w = room.result.w;
+    recordGame({
+      date: Date.now(), mode: 'online', opponent: opp?.name ?? 'Rival', color: myColor,
+      result: w === 'd' ? 'draw' : w === myColor ? 'win' : 'loss', reason: RT[room.result.r], moves: roomMoves(room), tc: room.tc,
+      durationMs: Date.now() - room.created
+    });
+  }, [over]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // reloj y reclamo por tiempo
   useEffect(() => {
