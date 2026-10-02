@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Jaque Mate</title>
+<meta name="description" content="Ajedrez online con amigos, contra la compu o en el mismo teléfono, con marcador.">
+<meta name="theme-color" content="#1b1f1a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Jaque Mate">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;800&family=Noto+Sans+Symbols+2&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+  <header>
+    <button class="brand" id="homeBtn" aria-label="Ir al menú"><span class="knight">&#9822;&#xFE0E;</span>Jaque Mate</button>
+    <div class="hdr-right">
+      <button class="chip" id="userChip" hidden></button>
+      <button class="icon-btn" id="soundBtn" aria-pressed="true" title="Sonido">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4z"/><path id="waves" d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ============ LOGIN ============ -->
+  <section class="view narrow" id="vLogin" hidden>
+    <div class="card-lg">
+      <div class="hero-glyph">&#9818;&#xFE0E;</div>
+      <h1 id="loginTitle">Entrar</h1>
+      <p class="muted" id="loginSub">Usa tu nombre y tu PIN para que el marcador sepa quién eres.</p>
+      <form id="loginForm" class="form" autocomplete="off">
+        <label class="field"><span class="label">Nombre</span>
+          <input id="inName" maxlength="16" required placeholder="Ej: Matías" autocapitalize="words"></label>
+        <label class="field"><span class="label">PIN de 4 números</span>
+          <input id="inPin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required placeholder="••••"></label>
+        <p class="err" id="loginErr" hidden></p>
+        <button class="primary" id="loginBtn" type="submit">Entrar</button>
+      </form>
+      <button class="link" id="loginToggle">¿Primera vez? Crear cuenta</button>
+      <button class="link muted" id="skipLogin">Jugar sin cuenta (solo contra la compu o en este teléfono)</button>
+    </div>
+  </section>
+
+  <!-- ============ MENÚ ============ -->
+  <section class="view" id="vMenu" hidden>
+    <div class="menu-grid">
+      <div class="mcard" id="onlineCard">
+        <div class="mcard-h"><span class="mglyph">&#9822;&#xFE0E;</span><div><h2>Jugar online</h2><p class="muted">Con un amigo en otro teléfono</p></div></div>
+        <div class="offline-note" id="onlineOff" hidden></div>
+        <div id="onlineOn">
+          <div class="field"><span class="label">Juegas con</span>
+            <div class="seg" id="segOColor"><button data-v="w">Blancas</button><button data-v="r">Al azar</button><button data-v="b">Negras</button></div></div>
+          <div class="field"><span class="label">Reloj</span>
+            <div class="seg" id="segOTime"><button data-v="none">Sin reloj</button><button data-v="3+2">3 | 2</button><button data-v="5+0">5 min</button><button data-v="10+0">10 min</button></div></div>
+          <button class="primary" id="createRoomBtn">Crear sala</button>
+          <div class="join-row">
+            <input id="joinCode" maxlength="4" placeholder="CÓDIGO" autocapitalize="characters" aria-label="Código de sala">
+            <button class="secondary" id="joinBtn">Unirme</button>
+          </div>
+          <p class="err" id="onlineErr" hidden></p>
+          <button class="link" id="resumeRoomBtn" hidden></button>
+        </div>
+      </div>
+
+      <div class="mcard">
+        <div class="mcard-h"><span class="mglyph">&#9819;&#xFE0E;</span><div><h2>Contra la compu</h2><p class="muted">Funciona sin internet</p></div></div>
+        <div class="field"><span class="label">Juegas con</span>
+          <div class="seg" id="segCColor"><button data-v="w">Blancas</button><button data-v="r">Al azar</button><button data-v="b">Negras</button></div></div>
+        <div class="field"><label class="label" for="lvl">Nivel</label>
+          <div class="lvl-row"><input type="range" id="lvl" min="1" max="5" step="1" value="3"><span class="lvl-name" id="lvlName"></span></div></div>
+        <button class="primary" id="cpuBtn">Jugar</button>
+      </div>
+
+      <div class="mcard">
+        <div class="mcard-h"><span class="mglyph">&#9820;&#xFE0E;</span><div><h2>En este teléfono</h2><p class="muted">Dos personas, un tablero</p></div></div>
+        <div class="field"><span class="label">Reloj</span>
+          <div class="seg" id="segLTime"><button data-v="none">Sin reloj</button><button data-v="3+2">3 | 2</button><button data-v="5+0">5 min</button><button data-v="10+0">10 min</button></div></div>
+        <button class="secondary big" id="pvpBtn">Empezar</button>
+        <button class="link" id="resumeBtn" hidden>Continuar partida guardada</button>
+      </div>
+
+      <div class="mcard wide" id="scoreCard">
+        <div class="mcard-h"><span class="mglyph">&#9813;&#xFE0E;</span><div><h2>Marcador</h2><p class="muted" id="scoreSub">Tus resultados contra cada rival</p></div></div>
+        <div id="scoreList" class="score-list"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SALA DE ESPERA ============ -->
+  <section class="view narrow" id="vLobby" hidden>
+    <div class="card-lg">
+      <p class="label">Sala creada</p>
+      <div class="code" id="lobbyCode">----</div>
+      <p class="muted">Pásale este código a tu rival o mándale el enlace. La partida empieza sola cuando entre.</p>
+      <div class="lobby-actions">
+        <button class="primary" id="shareBtn">Compartir enlace</button>
+        <button class="secondary" id="copyBtn">Copiar enlace</button>
+      </div>
+      <input id="linkField" class="linkfield" readonly aria-label="Enlace de la sala">
+      <div class="waiting"><span class="pulse"></span>Esperando rival…</div>
+      <button class="link" id="cancelRoomBtn">Cancelar sala</button>
+    </div>
+  </section>
+
+  <!-- ============ PARTIDA ============ -->
+  <section class="view" id="vGame" hidden>
+    <div class="layout">
+      <div class="play">
+        <div class="pbar" id="barTop">
+          <div class="avatar"></div>
+          <div class="pinfo"><div class="pname"></div><div class="caps"></div></div>
+          <div class="tag"></div>
+          <div class="clock" hidden></div>
+        </div>
+        <div class="board-wrap">
+          <div class="board" id="board" aria-label="Tablero de ajedrez"></div>
+          <div class="overlay" id="promo" hidden>
+            <div class="card"><h2 class="sm">Coronar peón</h2><div class="promo-row" id="promoRow"></div><button class="ghostbtn" id="promoCancel">Cancelar</button></div>
+          </div>
+          <div class="overlay" id="modal" hidden>
+            <div class="card">
+              <h2 id="mTitle"></h2>
+              <p id="mReason"></p>
+              <div class="score" id="mScore"></div>
+              <p class="tally" id="mTally" hidden></p>
+              <button class="primary" id="mAgain">Otra partida</button>
+              <div class="row2"><button class="ghostbtn" id="mMenu">Menú</button><button class="ghostbtn" id="mClose">Ver tablero</button></div>
+            </div>
+          </div>
+        </div>
+        <div class="pbar" id="barBot">
+          <div class="avatar"></div>
+          <div class="pinfo"><div class="pname"></div><div class="caps"></div></div>
+          <div class="tag"></div>
+          <div class="clock" hidden></div>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="sec">
+          <div class="status" id="status"></div>
+          <div class="banner" id="banner" hidden></div>
+          <div class="ctrls" id="ctrls"></div>
+        </div>
+        <div class="sec">
+          <div class="label">Jugadas</div>
+          <div class="moves" id="moves"></div>
+        </div>
+        <div class="sec">
+          <button class="ghostbtn" id="leaveBtn">Volver al menú</button>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <div class="toast" id="toast" hidden></div>
+</div>
+<script src="engine.js"></script>
+<script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,28 @@
+{
+  "rules": {
+    "users": {
+      "$uid": {
+        ".read": true,
+        ".write": "newData.exists() && (!data.exists() || data.child('pinHash').val() === newData.child('pinHash').val())",
+        ".validate": "newData.hasChildren(['name', 'pinHash']) && newData.child('name').isString() && newData.child('name').val().length <= 16"
+      }
+    },
+    "rooms": {
+      "$code": {
+        ".read": true,
+        ".write": true,
+        ".validate": "$code.length === 4"
+      }
+    },
+    "records": {
+      "$uid": {
+        ".read": true,
+        "$opp": { ".write": true }
+      }
+    },
+    "games": {
+      ".read": true,
+      "$id": { ".write": "!data.exists()" }
+    }
+  }
+}
