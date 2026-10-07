@@ -1,7 +1,7 @@
 /* Problemas: rating propio, temas, problema del día y sesión de resolución. */
 import { useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { dailyPuzzle, difficultyLabel, pickPuzzle, puzzleById, PUZZLES, THEMES, themeLabel, todayKey, type Puzzle } from '../problems/bank.ts';
+import { dailyPuzzle, difficultyLabel, LEVELS, pickPuzzle, puzzleById, PUZZLES, THEMES, themeLabel, todayKey, unseenCount, type Puzzle } from '../problems/bank.ts';
 import { dueReviews, progressStore, recordPuzzle, skills, today } from '../profile/progress.ts';
 import { useStore } from '../database/store.ts';
 import { MoveExercise, type ExerciseResult } from '../components/MoveExercise.tsx';
@@ -27,6 +27,7 @@ export function PuzzlesPage() {
   const acc = recent.length ? Math.round((100 * recent.filter(a => a.correct && a.hints === 0).length) / recent.length) : null;
   const due = dueReviews(p);
   const counts = useMemo(() => { const c: Record<string, number> = {}; PUZZLES.forEach(z => { c[z.theme] = (c[z.theme] || 0) + 1; }); return c; }, []);
+  const seenIds = useMemo(() => new Set(p.attempts.map(a => a.id)), [p.attempts]);
   return (
     <div className="page">
       <h1 className="page-title">Problemas</h1>
@@ -54,9 +55,23 @@ export function PuzzlesPage() {
       </section>
 
       <section className="card-block">
+        <div className="card-h"><h2>Por dificultad</h2><span className="muted small">{PUZZLES.length} problemas · {unseenCount(seenIds)} sin ver</span></div>
+        <div className="theme-grid">
+          {LEVELS.map(l => {
+            const n = PUZZLES.filter(z => z.rating >= l.min && z.rating <= l.max).length;
+            return (
+              <Link key={l.id} to={`/problema?nivel=${l.id}`} className="theme-card">
+                <strong>{l.label}</strong><span className="muted small">{n} problemas · {l.max > 5000 ? `${l.min}+` : `${l.min}–${l.max + 1}`}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="card-block">
         <h2>Por tema</h2>
         <div className="theme-grid">
-          {Object.entries(THEMES).map(([k, t]) => (
+          {Object.entries(THEMES).filter(([k]) => counts[k]).map(([k, t]) => (
             <Link key={k} to={`/problema?tema=${k}`} className="theme-card">
               <strong>{t.label}</strong><span className="muted small">{counts[k] ?? 0} problemas</span>
             </Link>
@@ -74,8 +89,10 @@ export function PuzzlePage() {
   const nav = useNavigate();
   const mode = params.get('modo') as 'diario' | 'repaso' | null;
   const theme = params.get('tema') ?? undefined;
+  const level = params.get('nivel') ?? undefined;
   const p = useStore(progressStore);
-  const seen = useRef(new Set<string>(p.attempts.slice(-60).map(a => a.id)));
+  // todos los problemas que ya intentaste: no se repiten hasta que hayas visto el resto
+  const seen = useRef(new Set<string>(p.attempts.map(a => a.id)));
   const [count, setCount] = useState(0);
   const [last, setLast] = useState<{ delta: number; xp: number; solved: boolean } | null>(null);
 
@@ -84,8 +101,8 @@ export function PuzzlePage() {
     if (mode === 'diario') return dailyPuzzle();
     if (mode === 'repaso') { const d = dueReviews(progressStore.get()); return d.length ? puzzleById(d[0].id) ?? null : null; }
     const weak = skills(progressStore.get()).filter(s => s.pct < 60).map(s => s.theme);
-    return pickPuzzle(progressStore.get().puzzleRating, { theme, recent: seen.current, weakThemes: weak });
-  }, [count, mode, theme]); // eslint-disable-line react-hooks/exhaustive-deps
+    return pickPuzzle(progressStore.get().puzzleRating, { theme, level, recent: seen.current, weakThemes: weak });
+  }, [count, mode, theme, level]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!puzzle) return (
     <div className="page narrow"><div className="card-lg"><h1>¡Repaso al día!</h1><p className="muted">No tienes problemas pendientes para hoy. Vuelve mañana o resuelve problemas nuevos.</p><Link className="primary" to="/problema">Problemas nuevos</Link></div></div>
@@ -107,7 +124,7 @@ export function PuzzlePage() {
       <div className="lesson-top">
         <button className="icon-btn" aria-label="Volver" onClick={() => nav('/problemas')}><Icon name="back" /></button>
         <div className="puzzle-meta">
-          <strong>{mode === 'diario' ? 'Problema del día' : mode === 'repaso' ? 'Repaso' : theme ? t?.label : 'Problemas'}</strong>
+          <strong>{mode === 'diario' ? 'Problema del día' : mode === 'repaso' ? 'Repaso' : theme ? t?.label : level ? `Problemas · ${LEVELS.find(l => l.id === level)?.label ?? ''}` : 'Problemas'}</strong>
           <span className="muted small">{difficultyLabel(puzzle.rating)} · {puzzle.rating} · tu rating {p.puzzleRating}</span>
         </div>
       </div>

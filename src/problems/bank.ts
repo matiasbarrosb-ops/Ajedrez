@@ -22,6 +22,7 @@ export const THEMES: Record<string, { label: string; hint: string; concept: stri
   mate3: { label: 'Mate en 3', hint: 'Busca una serie de jaques que vaya cerrando las salidas del rey.', concept: 'Los mates largos se calculan jugada por jugada, imaginando siempre la mejor defensa.' },
   doble: { label: 'Ataque doble', hint: '¿Alguna jugada ataca dos piezas a la vez?', concept: 'Un ataque doble amenaza dos cosas al mismo tiempo: el rival solo puede salvar una.' },
   colgada: { label: 'Pieza colgada', hint: '¿Hay alguna pieza rival que nadie defiende?', concept: 'Una pieza sin defensa se puede capturar gratis.' },
+  coronacion: { label: 'Coronación', hint: '¿Hay algún peón cerca de la última fila? ¿Qué pasa si corona?', concept: 'Un peón que corona se convierte en dama: muchas veces vale la pena sacrificar algo para lograrlo.' },
   material: { label: 'Ganar material', hint: 'Revisa jaques, capturas y amenazas: una de ellas gana algo.', concept: 'Ganar material es quedarse con más puntos de piezas que el rival.' }
 };
 export const themeLabel = (t: string) => THEMES[t]?.label ?? t;
@@ -49,10 +50,34 @@ export function dailyPuzzle(key = todayKey()): Puzzle {
   return pool[h % pool.length];
 }
 
-/** Siguiente problema cerca del rating del usuario, priorizando temas débiles y evitando los recientes. */
-export function pickPuzzle(rating: number, opts: { theme?: string; recent?: Set<string>; weakThemes?: string[] } = {}): Puzzle {
-  let pool = PUZZLES.filter(p => (!opts.theme || p.theme === opts.theme) && !opts.recent?.has(p.id));
-  if (!pool.length) pool = PUZZLES.filter(p => !opts.theme || p.theme === opts.theme);
-  const score = (p: Puzzle) => Math.abs(p.rating - rating) - (opts.weakThemes?.includes(p.theme) ? 120 : 0) + Math.random() * 120;
-  return pool.slice().sort((a, b) => score(a) - score(b))[0];
+export const LEVELS: { id: string; label: string; min: number; max: number }[] = [
+  { id: 'facil', label: 'Fácil', min: 0, max: 899 },
+  { id: 'media', label: 'Media', min: 900, max: 1299 },
+  { id: 'dificil', label: 'Difícil', min: 1300, max: 1699 },
+  { id: 'muydificil', label: 'Muy difícil', min: 1700, max: 9999 }
+];
+
+/**
+ * Siguiente problema cerca del rating del usuario, priorizando temas débiles.
+ * Nunca repite uno ya visto mientras queden problemas sin ver (la ventana de rating se agranda si hace falta).
+ */
+export function pickPuzzle(rating: number, opts: { theme?: string; level?: string; recent?: Set<string>; weakThemes?: string[] } = {}): Puzzle {
+  const lv = LEVELS.find(l => l.id === opts.level);
+  const base = PUZZLES.filter(p => (!opts.theme || p.theme === opts.theme) && (!lv || (p.rating >= lv.min && p.rating <= lv.max)));
+  let pool = base.filter(p => !opts.recent?.has(p.id));
+  if (!pool.length) pool = base.length ? base : PUZZLES;
+  const target = lv ? Math.max(lv.min, Math.min(lv.max, rating)) : rating;
+  for (const win of [100, 175, 275, 450, 99999]) {
+    const near = pool.filter(p => Math.abs(p.rating - target) <= win);
+    if (near.length >= 4 || win === 99999) {
+      const list = near.length ? near : pool;
+      const weak = list.filter(p => opts.weakThemes?.includes(p.theme));
+      const from = weak.length && Math.random() < 0.4 ? weak : list;
+      return from[Math.floor(Math.random() * from.length)];
+    }
+  }
+  return pool[0];
 }
+
+/** Cuántos problemas quedan sin ver. */
+export const unseenCount = (seen: Set<string>) => PUZZLES.filter(p => !seen.has(p.id)).length;

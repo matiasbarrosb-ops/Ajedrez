@@ -25,6 +25,28 @@ function isFork(P: E.Position, to: number): boolean {
   return targets.filter(v => v >= 3 && (v > piece || v === 100)).length >= 2 || (targets.includes(100) && targets.filter(v => v >= 3).length >= 2);
 }
 
+/** Dificultad estimada: tema, si la primera jugada es "callada" o un sacrificio, cuántos jaques hay, etc. */
+const BASE: Record<string, number> = { mate1: 600, mate2: 1150, mate3: 1550, colgada: 800, coronacion: 1000, doble: 1150, material: 1250 };
+function estimate(P: E.Position, m: E.Move, theme: string, legalCount: number): number {
+  let r = BASE[theme] ?? 1200;
+  const me = P.t, opp = me === 'w' ? 'b' : 'w';
+  const checks = E.legal(P).filter(x => { const u = E.make(P, x); const c = E.inCheck(P, opp); E.unmake(P, x, u); return c; }).length;
+  const u = E.make(P, m);
+  const isCheck = E.inCheck(P, opp);
+  // sacrificio: la pieza movida queda atacada y no está defendida, o vale más que lo que captura
+  const attackedNow = E.attacked(P, m.t, opp);
+  const defended = E.attacked(P, m.t, me);
+  const sac = attackedNow && (!defended || VAL[(m.pr || m.p).toUpperCase()] > (m.c ? VAL[m.c.toUpperCase()] : 0) + 1);
+  E.unmake(P, m, u);
+  if (!isCheck && !m.c) r += theme.startsWith('mate') ? 320 : 220;
+  if (m.c && !sac) r -= 80;
+  if (sac) r += 220;
+  if (theme === 'mate1') r += Math.min(200, (checks - 1) * 25) + ('NP'.includes(m.p.toUpperCase()) ? 80 : 0);
+  r += (legalCount - 30) * 4;
+  r += Math.random() * 120 - 60;
+  return Math.max(400, Math.min(2400, r));
+}
+
 let done = 0;
 for (const r of raws) {
   if (++done % 10 === 0) console.error('procesados', done, 'de', raws.length);
@@ -61,16 +83,24 @@ for (const r of raws) {
     const Q = parseFen(r.fen); E.make(Q, E.legal(Q).find(x => moveCode(x) === r.best)!);
     // captura de una pieza que nadie defiende
     const undefended = m.c && !E.attacked(Q, m.t, Q.t) ? true : false;
-    theme = isFork(Q, m.t) ? 'doble' : undefended ? 'colgada' : 'material';
-    base = theme === 'colgada' ? 950 : theme === 'doble' ? 1250 : 1350;
+    theme = m.pr ? 'coronacion' : isFork(Q, m.t) ? 'doble' : undefended ? 'colgada' : 'material';
+    base = theme === 'colgada' ? 950 : theme === 'doble' ? 1250 : theme === 'coronacion' ? 1100 : 1350;
     steps.push({ accept: acc });
   }
   const first = parseFen(r.fen), fm = E.legal(first).find(x => moveCode(x) === steps[0].accept[0])!;
-  const rating = Math.round((base + (legalCount - 28) * 6 + (Math.random() * 80 - 40)) / 10) * 10;
+  const rating = Math.round(estimate(first, fm, theme, legalCount) / 10) * 10;
   out.push({ id: 'p' + (out.length + 1), fen: r.fen, theme, rating: Math.max(500, Math.min(2300, rating)), steps, target: fm.t, from: fm.f });
 }
 out.sort((a, b) => a.rating - b.rating);
-out.forEach((p, i) => { p.id = 'p' + (i + 1); });
+// se conservan los ids de los problemas que ya existían, para no mezclar el historial de los usuarios
+const old: Puzzle[] = fs.existsSync('src/problems/puzzles.json') ? JSON.parse(fs.readFileSync('src/problems/puzzles.json', 'utf8')) : [];
+const oldByKey = new Map(old.map(p => [p.fen.split(' ').slice(0, 2).join(' '), p]));
+let nextId = old.reduce((mx, p) => Math.max(mx, Number(p.id.slice(1)) || 0), 0);
+for (const p of out) {
+  const o = oldByKey.get(p.fen.split(' ').slice(0, 2).join(' '));
+  if (o) p.id = o.id; else p.id = 'p' + ++nextId;
+}
+out.sort((a, b) => a.rating - b.rating);
 fs.writeFileSync('src/problems/puzzles.json', JSON.stringify(out));
 const by: Record<string, number> = {};
 out.forEach(p => { by[p.theme] = (by[p.theme] || 0) + 1; });

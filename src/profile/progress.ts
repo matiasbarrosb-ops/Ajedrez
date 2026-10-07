@@ -27,6 +27,10 @@ export interface GameRecord {
   durationMs: number;
   ratingBefore?: number;
   ratingAfter?: number;
+  /** calidad de cada medio-movimiento según el entrenador: '0'..'4', '-' sin analizar */
+  qs?: string;
+  /** precisión (0-100) de tus jugadas */
+  acc?: number;
 }
 
 export interface Progress {
@@ -218,6 +222,14 @@ export function recordGame(g: Omit<GameRecord, 'id' | 'ratingBefore' | 'ratingAf
     touchDay(p, g.moves.length >= 2 ? (g.result === 'win' ? 20 : 10) : 0, 'games');
   });
   return rec;
+}
+
+/** Agrega datos a una partida ya guardada (p. ej. el análisis del entrenador que termina después). */
+export function updateGame(id: string, patch: Partial<GameRecord>) {
+  mutate(p => {
+    const g = p.games.find(x => x.id === id);
+    if (g) Object.assign(g, patch);
+  });
 }
 
 /** Rating de hace 7 días (o el primero registrado). */

@@ -73,7 +73,7 @@ export function ProfilePage() {
       </section>
 
       <section className="card-block">
-        <h2>Estadísticas</h2>
+        <div className="card-h"><h2>Estadísticas</h2><button className="secondary small-btn" onClick={() => nav('/estadisticas')}>Ver todas</button></div>
         <div className="stat-grid">
           <div className="stat"><span className="stat-v">{games.length}</span><span className="stat-l">Partidas · {w} V · {l} D · {d} T</span></div>
           <div className="stat"><span className="stat-v">{recent.length}</span><span className="stat-l">Problemas{acc !== null ? ` · ${acc}% sin pistas` : ''}</span></div>

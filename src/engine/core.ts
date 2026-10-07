@@ -40,6 +40,9 @@ export interface SearchOptions {
   ms: number;
   /** ruido en centipeones para jugar peor a propósito (0 = mejor jugada) */
   n: number;
+  /** probabilidad (0-1) de jugar "descuidado": mira solo su propia jugada y no las respuestas del rival,
+   *  así deja piezas colgadas y no ve amenazas, como un principiante */
+  c?: number;
 }
 
 export interface SearchResult {
@@ -281,10 +284,24 @@ export function ab(P: Position, d: number, a: number, b: number, ply: number): n
   return a;
 }
 
+/** Jugada descuidada: elige por la evaluación inmediata, sin mirar qué responde el rival. */
+function carelessPick(P: Position, root: Move[], noise: number): SearchResult {
+  let best = root[0], bv = -1e18, bs = 0;
+  for (const m of root) {
+    const u = make(P, m);
+    const s = -evaluate(P);
+    unmake(P, m, u);
+    const v = s + Math.random() * Math.max(noise, 60);
+    if (v > bv) { bv = v; best = m; bs = s; }
+  }
+  return { move: { f: best.f, t: best.t, pr: best.pr || null }, score: bs, depth: 0 };
+}
+
 /** Busca la mejor jugada con profundización iterativa. */
 export function search(P: Position, o: SearchOptions): SearchResult | null {
   const root = legal(P);
   if (!root.length) return null;
+  if (o.c && Math.random() < o.c) return carelessPick(P, root, o.n);
   setDeadline(Date.now() + (o.ms || 1000));
   order(root);
   let list = root.map(m => ({ m, s: 0 }));
@@ -318,4 +335,34 @@ export function search(P: Position, o: SearchOptions): SearchResult | null {
     }
   }
   return { move: { f: pick.m.f, t: pick.m.t, pr: pick.m.pr || null }, score: pick.s, depth };
+}
+
+export interface RootScore { move: { f: number; t: number; pr: Piece | null }; score: number }
+
+/**
+ * Evalúa TODAS las jugadas legales (ventana completa) con profundización iterativa hasta d o hasta ms.
+ * Lo usa el entrenador para comparar tu jugada con la mejor. Puntajes desde el bando que mueve.
+ */
+export function analyzeRoot(P: Position, d: number, ms: number): { list: RootScore[]; depth: number } {
+  const root = legal(P);
+  if (!root.length) return { list: [], depth: 0 };
+  setDeadline(Date.now() + 1e9); // la profundidad 1 siempre se completa
+  order(root);
+  let done: { m: Move; s: number }[] = root.map(m => ({ m, s: 0 })), depth = 0;
+  const t0 = Date.now();
+  for (let k = 1; k <= d; k++) {
+    if (k === 2) { stopAt = t0 + ms; }
+    const res: { m: Move; s: number }[] = [];
+    for (const it of done) {
+      const u = make(P, it.m);
+      const s = -ab(P, k - 1, -1e9, 1e9, 1);
+      unmake(P, it.m, u);
+      if (aborted) break;
+      res.push({ m: it.m, s });
+    }
+    if (aborted) break;
+    res.sort((x, y) => y.s - x.s);
+    done = res; depth = k;
+  }
+  return { list: done.map(x => ({ move: { f: x.m.f, t: x.m.t, pr: x.m.pr || null }, score: x.s })), depth };
 }

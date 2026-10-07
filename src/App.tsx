@@ -12,6 +12,7 @@ import { PuzzlesPage, PuzzlePage } from './pages/PuzzlesPage.tsx';
 import { TrainPage } from './pages/TrainPage.tsx';
 import { GamesPage, GameViewerPage } from './pages/GamesPage.tsx';
 import { ProfilePage } from './pages/ProfilePage.tsx';
+import { StatsPage } from './pages/StatsPage.tsx';
 import { WelcomePage } from './pages/WelcomePage.tsx';
 import { LoginPage } from './pages/LoginPage.tsx';
 import { getFb } from './database/firebase.ts';
@@ -48,6 +49,7 @@ export default function App() {
           <Route path="/problemas" element={<PuzzlesPage />} />
           <Route path="/partidas" element={<GamesPage />} />
           <Route path="/perfil" element={<ProfilePage />} />
+          <Route path="/estadisticas" element={<StatsPage />} />
           <Route path="/bienvenida" element={<WelcomePage />} />
           <Route path="/entrar" element={<LoginPage />} />
           <Route path="*" element={<HomePage />} />

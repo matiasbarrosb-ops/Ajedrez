@@ -11,11 +11,13 @@ Etapas 1, 2, 5, 6 y 7 listas (de 9). Faltan la barra de evaluación, el tutor en
 
 - Navegación: Inicio, Jugar, Aprender, Entrenar, Problemas, Partidas, Perfil (barra inferior en celular, lateral en computador).
 - Bienvenida con dos preguntas que arman el plan inicial.
-- Jugar: partida rápida, 5 bots (400 a 2000), ritmos 1+0 a 15+10 y personalizado, dos personas en el mismo teléfono, amigo online por código.
+- Jugar: partida rápida, 7 bots (250 a 2000; los fáciles juegan "descuidados" y dejan piezas colgadas), ritmos 1+0 a 15+10 y personalizado, dos personas en el mismo teléfono, amigo online por código.
 - Tablero: tocar o arrastrar, jugadas legales, última jugada, jaque, coronación, enroque, captura al paso, tablas por repetición/50 jugadas/material, reloj con incremento.
 - Cuentas con nombre + PIN y marcador por rival.
-- Aprender: 28 lecciones en 7 unidades (Principiante, Intermedio, Avanzado), camino paso a paso con estrellas y XP.
-- Problemas: 334 problemas generados y verificados con el motor, con rating Elo propio, temas, 3 pistas y problema del día.
+- Aprender: 58 lecciones en 14 unidades (Principiante, Intermedio, Avanzado), camino paso a paso con estrellas y XP.
+- Entrenador en la partida: califica cada jugada en 5 niveles (Excelente, Buena, Imprecisión, Error, Error grave), explica por qué, muestra la mejor jugada y en qué fijarse; avisa qué te amenaza después de cada jugada del rival.
+- Estadísticas: resultados por color y rival, calidad de jugadas, precisión por partida, piezas que más mueves, aperturas y tabla partida por partida.
+- Problemas: banco generado y verificado con el motor, con rating Elo propio, 4 niveles de dificultad, temas, 3 pistas y problema del día. No se repiten hasta haber visto todos.
 - Entrenar: repaso espaciado (1, 3, 7, 14, 30 días), recomendaciones por tema débil y finales contra el motor.
 - Partidas: historial con visor jugada por jugada; rating Elo contra los bots.
 - Perfil: nivel, XP, racha (con un día libre), estadísticas, fortalezas y áreas para mejorar, gráfico de rating.
@@ -45,7 +47,8 @@ npm run dev          # desarrollo en http://localhost:5173
 npm run build        # compila a docs/ (lo que publica GitHub Pages)
 npm test             # perft: verifica el generador de jugadas
 node tools/check-lessons.ts   # resuelve cada ejercicio de las lecciones
-node tools/build-puzzles.ts   # verifica y arma el banco de problemas
+node tools/gen-puzzles.ts 500 tools/data/rawN.json 1800000   # genera problemas nuevos (30 min)
+node tools/build-puzzles.ts   # verifica y arma el banco de problemas (conserva los ids existentes)
 npm run test:online  # dos navegadores juegan una partida online (Firebase simulado)
 ```
 

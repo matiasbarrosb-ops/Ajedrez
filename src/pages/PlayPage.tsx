@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Color } from '../engine/core.ts';
-import { BOTS } from '../engine/bots.ts';
+import { BOTS, botById } from '../engine/bots.ts';
 import { TIME_CONTROLS } from '../chess/clock.ts';
 import { Segmented } from '../components/Segmented.tsx';
 import { Icon } from '../components/Icon.tsx';
@@ -20,7 +20,7 @@ const DEFAULT: PlayPrefs = { botId: 2, color: 'r', tc: '10+0', customMin: 20, cu
 /** Bot sugerido según lo que respondió en la bienvenida. */
 export function suggestedBot(): number {
   const e = onboardingStore.get().experience;
-  return e === 'nunca' ? 1 : e === 'mover' ? 2 : e === 'aveces' ? 3 : e === 'seguido' ? 4 : e === 'compito' ? 5 : 2;
+  return e === 'nunca' ? 1 : e === 'mover' ? 2 : e === 'aveces' ? 4 : e === 'seguido' ? 5 : e === 'compito' ? 7 : 2;
 }
 
 export function PlayPage() {
@@ -59,7 +59,7 @@ export function PlayPage() {
 
       <button className="primary hero-btn" onClick={() => startBot(prefs.botId, '10+0')}>
         <Icon name="bolt" /> Partida rápida
-        <small>10 minutos contra {BOTS[prefs.botId - 1].name} ({BOTS[prefs.botId - 1].rating})</small>
+        <small>10 minutos contra {botById(prefs.botId).name} ({botById(prefs.botId).rating})</small>
       </button>
       {saved && !saved.result && saved.moves.length > 0 && (
         <button className="secondary resume" onClick={() => nav('/partida')}>Continuar partida guardada ({saved.moves.length} jugadas)</button>
@@ -101,7 +101,7 @@ export function PlayPage() {
           <Segmented value={prefs.color} onChange={v => update({ color: v })} label="Color"
             options={[{ value: 'w', label: 'Blancas' }, { value: 'r', label: 'Al azar' }, { value: 'b', label: 'Negras' }]} />
         </div>
-        <button className="primary" onClick={() => startBot()}>Jugar contra {BOTS[prefs.botId - 1].name}</button>
+        <button className="primary" onClick={() => startBot()}>Jugar contra {botById(prefs.botId).name}</button>
       </section>
 
       <section className="card-block">

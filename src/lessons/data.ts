@@ -13,6 +13,8 @@
  * Todo ejercicio se verifica con `node tools/check-lessons.ts`.
  */
 
+import { MORE_UNITS } from './more.ts';
+
 export type Level = 'Principiante' | 'Intermedio' | 'Avanzado';
 
 export type MoveGoal =
@@ -44,7 +46,7 @@ export type Step = InfoStep | QuizStep | MoveStep | PuzzleStep;
 export interface Lesson { id: string; title: string; glyph: string; topic: string; steps: Step[]; summary: string[] }
 export interface Unit { id: string; level: Level; title: string; desc: string; lessons: Lesson[] }
 
-export const UNITS: Unit[] = [
+const BASE_UNITS: Unit[] = [
   {
     id: 'piezas', level: 'Principiante', title: 'Conoce las piezas', desc: 'Cómo se mueve cada una y cuánto vale',
     lessons: [
@@ -223,6 +225,8 @@ export const UNITS: Unit[] = [
     ]
   }
 ];
+
+export const UNITS: Unit[] = [...BASE_UNITS, ...MORE_UNITS];
 
 export const ALL_LESSONS = UNITS.flatMap(u => u.lessons.map(l => ({ ...l, unit: u })));
 export const lessonById = (id: string) => ALL_LESSONS.find(l => l.id === id);

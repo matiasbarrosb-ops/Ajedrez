@@ -8,7 +8,10 @@ import { loadSavedLocal, startLocalGame, useLocalGame } from '../hooks/useLocalG
 import { useStore } from '../database/store.ts';
 import { sessionStore } from '../database/session.ts';
 import { bumpRecord } from '../database/online.ts';
-import { recordGame } from '../profile/progress.ts';
+import { recordGame, updateGame } from '../profile/progress.ts';
+import { settingsStore } from '../database/session.ts';
+import { useCoach, qualityString } from '../coach/useCoach.ts';
+import { CoachPanel } from '../components/CoachPanel.tsx';
 import { REASON_TEXT as RT } from '../chess/game.ts';
 import { loadSavedLocal as loadSaved } from '../hooks/useLocalGame.ts';
 
@@ -29,6 +32,10 @@ function LocalGame({ onRestart }: { onRestart: () => void }) {
   const [overSeen, setOverSeen] = useState(!!result);
   const [armedResign, setArmedResign] = useState(0);
   const recorded = useRef(!!result);
+  const recId = useRef<string | null>(null);
+  const settings = useStore(settingsStore);
+  const sides: Color[] = cfg.mode === 'bot' ? [cfg.human] : ['w', 'b'];
+  const coach = useCoach(game, g.version, sides, settings.coach);
 
   const baseOrientation: Color = cfg.mode === 'bot' ? cfg.human : 'w';
   const orientation: Color = flip ? (baseOrientation === 'w' ? 'b' : 'w') : baseOrientation;
@@ -40,11 +47,13 @@ function LocalGame({ onRestart }: { onRestart: () => void }) {
     setOverSeen(false);
     if (!recorded.current) {
       const human = cfg.mode === 'bot' ? cfg.human : 'w';
-      recordGame({
+      const rec = recordGame({
         date: Date.now(), mode: cfg.mode, opponent: cfg.mode === 'bot' ? g.bot.name : 'Dos jugadores', opponentRating: cfg.mode === 'bot' ? g.bot.rating : undefined,
         color: human, result: !result.winner ? 'draw' : result.winner === human ? 'win' : 'loss', reason: RT[result.reason], moves: game.codes, tc: cfg.tc,
-        durationMs: Date.now() - (loadSaved()?.startedAt ?? Date.now())
+        durationMs: Date.now() - (loadSaved()?.startedAt ?? Date.now()),
+        qs: qualityString(coach.notes, game.hist.length), ...(coach.accuracy !== null ? { acc: coach.accuracy } : {})
       });
+      recId.current = rec.id;
     }
     if (!recorded.current && cfg.mode === 'bot' && user && game.hist.length >= 2) {
       const res = !result.winner ? 'd' : result.winner === cfg.human ? 'w' : 'l';
@@ -52,6 +61,12 @@ function LocalGame({ onRestart }: { onRestart: () => void }) {
     }
     recorded.current = true;
   }, [result]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // el análisis de las últimas jugadas puede terminar después del final: se actualiza la partida guardada
+  useEffect(() => {
+    if (!result || !recId.current || !coach.notes.length) return;
+    updateGame(recId.current, { qs: qualityString(coach.notes, game.hist.length), ...(coach.accuracy !== null ? { acc: coach.accuracy } : {}) });
+  }, [coach.notes.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const players: Record<Color, PlayerInfo> = cfg.mode === 'bot'
     ? {
@@ -95,6 +110,8 @@ function LocalGame({ onRestart }: { onRestart: () => void }) {
           primary={{ label: cfg.mode === 'bot' ? 'Revancha (colores cambiados)' : 'Otra partida', onClick: again }}
           onMenu={() => nav('/jugar')} onClose={() => setOverSeen(true)} />
       ) : null}
+      coach={<CoachPanel msgs={coach.msgs} busy={coach.busy} accuracy={coach.accuracy} notes={coach.notes} showSide={cfg.mode === 'local'}
+        enabled={settings.coach} onToggle={() => settingsStore.set(s => ({ ...s, coach: !s.coach }))} />}
       footer={<button className="btn-ghost" onClick={() => nav('/jugar')}>Volver a Jugar</button>}
     />
   );

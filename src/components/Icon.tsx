@@ -1,5 +1,5 @@
 /* Íconos de línea propios (SVG en línea, heredan el color del texto). */
-export type IconName = 'home' | 'play' | 'learn' | 'train' | 'puzzle' | 'games' | 'profile' | 'sound' | 'mute' | 'undo' | 'flip' | 'flag' | 'hint' | 'draw' | 'back' | 'share' | 'copy' | 'lock' | 'check' | 'clock' | 'bolt' | 'fire' | 'robot' | 'users' | 'phone';
+export type IconName = 'home' | 'play' | 'learn' | 'train' | 'puzzle' | 'games' | 'profile' | 'sound' | 'mute' | 'undo' | 'flip' | 'flag' | 'hint' | 'draw' | 'back' | 'share' | 'copy' | 'lock' | 'check' | 'clock' | 'bolt' | 'fire' | 'robot' | 'users' | 'phone' | 'stats';
 
 const P: Record<IconName, string> = {
   home: 'M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z',
@@ -26,7 +26,8 @@ const P: Record<IconName, string> = {
   fire: 'M12 22c4 0 7-3 7-7 0-5-5-7-5-12-3 2-5 5-5 8-1-1-2-2-2-4-2 2-2 5-2 8 0 4 3 7 7 7z',
   robot: 'M5 9h14v10H5zM12 5v4M9 13h.01M15 13h.01M9 16h6M3 13v3M21 13v3',
   users: 'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21c0-3.5 3-6 7-6s7 2.5 7 6M16 3.5a4 4 0 0 1 0 7M18 15c2.5.7 4 2.8 4 6',
-  phone: 'M7 2h10v20H7zM11 18h2'
+  phone: 'M7 2h10v20H7zM11 18h2',
+  stats: 'M4 20V10M10 20V4M16 20v-7M22 20H2'
 };
 
 export function Icon({ name, size = 20 }: { name: IconName; size?: number }) {

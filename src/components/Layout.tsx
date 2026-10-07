@@ -13,6 +13,7 @@ export const NAV: NavItem[] = [
   { to: '/entrenar', label: 'Entrenar', icon: 'train', mobile: false },
   { to: '/problemas', label: 'Problemas', icon: 'puzzle', mobile: true },
   { to: '/partidas', label: 'Partidas', icon: 'games', mobile: false },
+  { to: '/estadisticas', label: 'Estadísticas', icon: 'stats', mobile: false },
   { to: '/perfil', label: 'Perfil', icon: 'profile', mobile: true }
 ];
 

@@ -7,7 +7,7 @@ const START='rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 const target=+process.argv[2]||200, out=process.argv[3]||'puzzles-raw.json';
 const found=[],seen=new Set();let games=0;const t0=Date.now();
 function insufficientOrOver(P){return E.legal(P).length===0||P.h>=100;}
-while(found.length<target&&Date.now()-t0<540000){
+while(found.length<target&&Date.now()-t0<(+process.argv[4]||540000)){
   games++;const P=fen2pos(START);let prev=null;
   for(let ply=0;ply<140;ply++){
     if(insufficientOrOver(P))break;

@@ -23,9 +23,10 @@ interface Props {
   controls: Control[];
   overlay?: ReactNode;
   footer?: ReactNode;
+  coach?: ReactNode;
 }
 
-export function GameView({ P, orientation, players, legalMoves, onMove, hist, status, banner, controls, overlay, footer }: Props) {
+export function GameView({ P, orientation, players, legalMoves, onMove, hist, status, banner, controls, overlay, footer, coach }: Props) {
   const top: Color = orientation === 'w' ? 'b' : 'w';
   const bottom: Color = orientation;
   const last = hist.length ? hist[hist.length - 1].m : null;
@@ -52,6 +53,7 @@ export function GameView({ P, orientation, players, legalMoves, onMove, hist, st
             ))}
           </div>
         </div>
+        {coach && <div className="sec coach-sec">{coach}</div>}
         <div className="sec">
           <div className="label">Jugadas</div>
           <MoveList hist={hist} />
