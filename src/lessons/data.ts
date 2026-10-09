@@ -14,8 +14,9 @@
  */
 
 import { MORE_UNITS } from './more.ts';
+import { OPENING_UNITS, TACTIC_UNITS } from './tactics.ts';
 
-export type Level = 'Principiante' | 'Intermedio' | 'Avanzado';
+export type Level = 'Principiante' | 'Intermedio' | 'Avanzado' | 'Tácticas' | 'Aperturas';
 
 export type MoveGoal =
   | { anyOf: string[] }
@@ -226,7 +227,7 @@ const BASE_UNITS: Unit[] = [
   }
 ];
 
-export const UNITS: Unit[] = [...BASE_UNITS, ...MORE_UNITS];
+export const UNITS: Unit[] = [...BASE_UNITS, ...MORE_UNITS, ...TACTIC_UNITS, ...OPENING_UNITS];
 
 export const ALL_LESSONS = UNITS.flatMap(u => u.lessons.map(l => ({ ...l, unit: u })));
 export const lessonById = (id: string) => ALL_LESSONS.find(l => l.id === id);

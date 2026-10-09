@@ -15,6 +15,8 @@ export interface LocalConfig {
   /** color del usuario contra el bot (en modo local siempre 'w' abajo) */
   human: Color;
   tc: string;
+  /** modo entrenador: comenta cada jugada (con voz). Sin esto es el modo Bots, sin comentarios. */
+  coach?: boolean;
 }
 
 interface Saved extends LocalConfig {

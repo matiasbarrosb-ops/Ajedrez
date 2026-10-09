@@ -120,9 +120,9 @@ export function StatsPage() {
           <HBars rows={QUALITY.map((q, i) => ({ label: <QualityBadge q={i} />, v: s.quality[i], cls: q.cls, note: `${s.quality[i]} (${pct(s.quality[i], qTotal)}%)` }))} />
         ) : <p className="muted small">Activa el entrenador en tus partidas: cada jugada tuya se califica en 5 niveles y aparece aquí.</p>}
         {qTotal > 0 && (
-          <p className="small">{pct(s.quality[3] + s.quality[4], qTotal) > 15
-            ? `Cometes errores en el ${pct(s.quality[3] + s.quality[4], qTotal)}% de tus jugadas. Lo que más ayuda: antes de mover, revisa qué piezas tuyas quedan atacadas.`
-            : `Solo el ${pct(s.quality[3] + s.quality[4], qTotal)}% de tus jugadas son errores. ¡Bien! Para subir, busca la mejor jugada y no solo una buena.`}</p>
+          <p className="small">{pct(s.quality[4] + s.quality[5], qTotal) > 15
+            ? `Cometes errores en el ${pct(s.quality[4] + s.quality[5], qTotal)}% de tus jugadas. Lo que más ayuda: antes de mover, revisa qué piezas tuyas quedan atacadas.`
+            : `Solo el ${pct(s.quality[4] + s.quality[5], qTotal)}% de tus jugadas son errores. ¡Bien! Para subir, busca la mejor jugada y no solo una buena.`}</p>
         )}
       </section>
 

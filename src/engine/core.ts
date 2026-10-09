@@ -43,6 +43,8 @@ export interface SearchOptions {
   /** probabilidad (0-1) de jugar "descuidado": mira solo su propia jugada y no las respuestas del rival,
    *  así deja piezas colgadas y no ve amenazas, como un principiante */
   c?: number;
+  /** probabilidad (0-1) de jugar una jugada al azar (como quien recién aprende a mover las piezas) */
+  r?: number;
 }
 
 export interface SearchResult {
@@ -301,6 +303,10 @@ function carelessPick(P: Position, root: Move[], noise: number): SearchResult {
 export function search(P: Position, o: SearchOptions): SearchResult | null {
   const root = legal(P);
   if (!root.length) return null;
+  if (o.r && Math.random() < o.r) {
+    const m = root[Math.floor(Math.random() * root.length)];
+    return { move: { f: m.f, t: m.t, pr: m.pr || null }, score: 0, depth: 0 };
+  }
   if (o.c && Math.random() < o.c) return carelessPick(P, root, o.n);
   setDeadline(Date.now() + (o.ms || 1000));
   order(root);

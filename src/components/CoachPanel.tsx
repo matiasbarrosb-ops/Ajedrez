@@ -1,8 +1,9 @@
 /* Chat del entrenador: un mensaje por jugada con su calificación, el porqué y en qué fijarse. */
 import { useEffect, useRef, useState } from 'react';
-import { QUALITY, type CoachNote } from '../coach/coach.ts';
+import { QUALITY, type CoachNote, type OpponentNote } from '../coach/coach.ts';
 import type { CoachMsg } from '../coach/useCoach.ts';
 import { FigSan } from './MoveList.tsx';
+import { Icon } from './Icon.tsx';
 
 const moveNo = (ply: number) => `${Math.floor(ply / 2) + 1}.${ply % 2 ? '..' : ''}`;
 
@@ -33,7 +34,8 @@ interface Props {
   notes: CoachNote[];
   /** en partidas de dos jugadores se indica de quién es la jugada */
   showSide?: boolean;
-  onToggle: () => void;
+  /** sin onToggle (modo entrenador) el panel no se puede ocultar */
+  onToggle?: () => void;
   enabled: boolean;
 }
 
@@ -41,7 +43,7 @@ export function CoachPanel({ msgs, busy, accuracy, notes, showSide, onToggle, en
   const ref = useRef<HTMLDivElement>(null);
   const [legend, setLegend] = useState(false);
   useEffect(() => { if (ref.current) ref.current.scrollTop = ref.current.scrollHeight; }, [msgs.length, busy]);
-  const counts = [0, 0, 0, 0, 0];
+  const counts = [0, 0, 0, 0, 0, 0];
   notes.forEach(n => counts[n.q]++);
   return (
     <div className="coach">
@@ -49,7 +51,7 @@ export function CoachPanel({ msgs, busy, accuracy, notes, showSide, onToggle, en
         <span className="coach-av" aria-hidden="true">{'♞︎'}</span>
         <div className="coach-title"><strong>Entrenador</strong><span className="muted small">{enabled ? (accuracy !== null ? `Precisión ${accuracy}%` : 'Califico cada jugada tuya') : 'Apagado'}</span></div>
         <button className="link" onClick={() => setLegend(l => !l)}>{legend ? 'Cerrar' : 'Niveles'}</button>
-        <button className="link" onClick={onToggle}>{enabled ? 'Ocultar' : 'Activar'}</button>
+        {onToggle && <button className="link" onClick={onToggle}>{enabled ? 'Ocultar' : 'Activar'}</button>}
       </div>
       {legend && (
         <ul className="coach-legend">
@@ -64,10 +66,52 @@ export function CoachPanel({ msgs, busy, accuracy, notes, showSide, onToggle, en
           {!msgs.length && !busy && <div className="cbubble info">Haz tu jugada y te digo qué tan buena fue, por qué, y en qué fijarte.</div>}
           {msgs.map(m => m.kind === 'move'
             ? <MoveBubble key={'m' + m.ply} n={m.note} sideLabel={showSide ? (m.note.side === 'w' ? 'Blancas' : 'Negras') : undefined} />
-            : <div key={'i' + m.ply} className="cbubble info">{m.lines.map((l, i) => <p key={i}>{l}</p>)}</div>)}
+            : <div key={'o' + m.ply} className={`cbubble info${m.note.slip ? ' slip' : ''}`}><p><strong>Rival · {moveNo(m.ply)} <FigSan san={m.note.san} /></strong></p>{m.note.lines.map((l, i) => <p key={i}>{l}</p>)}</div>)}
           {busy && <div className="cbubble info typing">Analizando tu jugada…</div>}
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Comentario de la última jugada, justo debajo de tu reloj: se lee sin bajar la pantalla.
+ * Arriba, tu última jugada (calificación, el porqué y la mejor si te equivocaste); abajo, qué hizo el rival después.
+ */
+export function CoachStrip({ mine, opp, busy, showBest, onShowBest, voiceOn, onVoice, voiceAvailable }: {
+  mine: CoachNote | null;
+  opp: OpponentNote | null;
+  busy: boolean;
+  showBest: boolean;
+  onShowBest: () => void;
+  voiceOn: boolean;
+  onVoice: () => void;
+  voiceAvailable: boolean;
+}) {
+  const reason = mine ? (mine.why.find(w => !/^Según el análisis/.test(w)) ?? mine.why[0]) : '';
+  const canBest = !!mine && mine.q >= 2 && !!mine.best;
+  return (
+    <div className={`coach-strip${mine ? ' ' + QUALITY[mine.q].cls : ''}`} aria-live="polite">
+      <span className="coach-av sm" aria-hidden="true">{'♞︎'}</span>
+      <div className="cs-body">
+        {mine ? (
+          <>
+            <p className="cs-head"><QualityBadge q={mine.q} /> <strong><FigSan san={mine.san} /></strong></p>
+            <p className="cs-text">{reason}{mine.q >= 2 && mine.best ? <> Mejor era <strong><FigSan san={mine.best} /></strong>.</> : null}</p>
+          </>
+        ) : (
+          <p className="cs-text">{busy ? 'Mirando tu jugada…' : 'Haz tu jugada: te digo qué tan buena fue y por qué.'}</p>
+        )}
+        {opp && <p className={`cs-opp${opp.slip ? ' slip' : ''}`}><span>Rival <FigSan san={opp.san} />:</span> {opp.lines.join(' ')}</p>}
+      </div>
+      <div className="cs-acts">
+        {canBest && <button className="link" onClick={onShowBest}>{showBest ? 'Ocultar' : 'Ver mejor'}</button>}
+        {voiceAvailable && (
+          <button className="icon-btn sm" onClick={onVoice} aria-pressed={voiceOn} aria-label={voiceOn ? 'Silenciar la voz' : 'Activar la voz'} title={voiceOn ? 'Voz activada' : 'Voz apagada'}>
+            <Icon name={voiceOn ? 'sound' : 'mute'} size={18} />
+          </button>
+        )}
+      </div>
     </div>
   );
 }

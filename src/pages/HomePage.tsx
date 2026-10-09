@@ -2,9 +2,9 @@
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useStore } from '../database/store.ts';
 import { onboardingStore, sessionStore } from '../database/session.ts';
-import { currentStreak, dueReviews, levelOf, progressStore, rankOf, ratingWeekAgo, skills, today } from '../profile/progress.ts';
+import { currentStreak, dueReviews, levelOf, openingProgress, progressStore, rankOf, ratingWeekAgo, skills, themeProgress, today } from '../profile/progress.ts';
 import { ALL_LESSONS } from '../lessons/data.ts';
-import { dailyPuzzle, difficultyLabel, themeLabel, todayKey } from '../problems/bank.ts';
+import { dailyPuzzle, difficultyLabel, openingLabel, THEMES, themeLabel, todayKey, useBankReady } from '../problems/bank.ts';
 import { Icon } from '../components/Icon.tsx';
 import { Records } from '../components/Records.tsx';
 import { loadSavedLocal } from '../hooks/useLocalGame.ts';
@@ -15,13 +15,17 @@ export function HomePage() {
   const { user } = useStore(sessionStore);
   const ob = useStore(onboardingStore);
   const p = useStore(progressStore);
+  const bankReady = useBankReady();
   if (!ob.done) return <Navigate to="/bienvenida" replace />;
 
   const saved = loadSavedLocal();
   const lv = levelOf(p.xp);
   const streak = currentStreak(p);
   const t = today(p);
-  const nextLesson = ALL_LESSONS.find(l => !p.lessons[l.id]);
+  // primero lo básico; después, tácticas
+  const nextLesson = ALL_LESSONS.find(l => l.unit.level === 'Principiante' && !p.lessons[l.id])
+    ?? ALL_LESSONS.find(l => l.unit.level === 'Tácticas' && !p.lessons[l.id])
+    ?? ALL_LESSONS.find(l => !p.lessons[l.id]);
   const daily = dailyPuzzle();
   const dailyDone = !!p.days[todayKey()]?.daily;
   const due = dueReviews(p).length;
@@ -35,6 +39,8 @@ export function HomePage() {
   const acc = recent.length ? Math.round((100 * recent.filter(a => a.correct && a.hints === 0).length) / recent.length) : null;
   const week = ratingWeekAgo(p);
   const weakest = skills(p).find(s => s.pct < 70);
+  const tactics = themeProgress(p).filter(x => THEMES[x.theme]?.group === 'tactica').slice(0, 5);
+  const openings = openingProgress(p).slice(0, 3);
 
   return (
     <div className="page home">
@@ -71,7 +77,7 @@ export function HomePage() {
         <section className="card-block daily-card">
           <div className="card-h"><h2>Problema del día</h2>{dailyDone && <span className="pill good">Resuelto</span>}</div>
           <div className="daily-body">
-            <MiniBoard fen={daily.fen} />
+            {bankReady ? <MiniBoard fen={daily.fen} /> : <div className="mini-board" />}
             <div className="daily-info">
               <p className="muted small">{themeLabel(daily.theme)}</p>
               <p className="muted small">{difficultyLabel(daily.rating)} · {daily.rating}</p>
@@ -87,6 +93,23 @@ export function HomePage() {
             <div className="stat"><span className="stat-v">{p.puzzleRating}</span><span className="stat-l">Rating de problemas</span></div>
             <div className="stat"><span className="stat-v">{recent.length}</span><span className="stat-l">Problemas jugados</span></div>
             <div className="stat"><span className="stat-v">{acc === null ? '—' : `${acc}%`}</span><span className="stat-l">Aciertos sin pistas</span></div>
+          </div>
+          <div className="tactic-prog">
+            <div className="card-h"><h3>Tus tácticas</h3><Link className="link" to="/problemas">Practicar</Link></div>
+            {tactics.length ? (
+              <ul className="tp-list">
+                {tactics.map(x => (
+                  <li key={x.theme}>
+                    <Link to={`/problema?tema=${x.theme}`}>{themeLabel(x.theme)}</Link>
+                    <span className="tp-bar"><span className={x.pct >= 70 ? 'good' : x.pct < 50 ? 'bad' : ''} style={{ width: `${Math.max(4, x.pct)}%` }} /></span>
+                    <span className="tp-v">{x.pct}%<small> · {x.n}</small></span>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="muted small">Resuelve problemas de tácticas (ataque doble, clavada, ensartada…) y aquí verás en cuáles aciertas más.</p>}
+            {openings.length > 0 && (
+              <p className="muted small">Aperturas: {openings.map(o => `${openingLabel(o.op)} ${o.pct}%`).join(' · ')}</p>
+            )}
           </div>
           {weakest && <p className="reco"><Icon name="hint" size={16} /> Te recomendamos practicar <Link to={`/problema?tema=${weakest.theme}`}>{themeLabel(weakest.theme).toLowerCase()}</Link>: aciertas {weakest.pct}%.</p>}
         </section>

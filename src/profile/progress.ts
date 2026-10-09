@@ -9,7 +9,7 @@ import { getFb } from '../database/firebase.ts';
 import { onboardingStore, sessionStore } from '../database/session.ts';
 import { todayKey } from '../problems/bank.ts';
 
-export interface Attempt { id: string; theme: string; correct: boolean; hints: number; date: number; source: 'problemas' | 'diario' | 'repaso' | 'leccion' }
+export interface Attempt { id: string; theme: string; correct: boolean; hints: number; date: number; source: 'problemas' | 'diario' | 'repaso' | 'leccion'; /** apertura del problema, si la táctica ocurre en la apertura */ op?: string }
 export interface ReviewItem { due: string; interval: number; streak: number; theme: string }
 export interface LessonDone { stars: number; date: number; hints: number }
 export interface DayLog { lessons: number; puzzles: number; games: number; daily?: boolean; xp: number }
@@ -162,7 +162,7 @@ export function completeLesson(id: string, hints: number, mistakes: number) {
 /* ---------- problemas ---------- */
 const S_BY_HINTS = [1, 0.6, 0.3, 0];
 const INTERVALS = [1, 3, 7, 14, 30];
-export function recordPuzzle(pz: { id: string; theme: string; rating: number }, correct: boolean, hints: number, source: Attempt['source']) {
+export function recordPuzzle(pz: { id: string; theme: string; rating: number; op?: string }, correct: boolean, hints: number, source: Attempt['source']) {
   let delta = 0, xpGain = 0;
   mutate(p => {
     const s = correct ? S_BY_HINTS[Math.min(3, hints)] : 0;
@@ -173,7 +173,7 @@ export function recordPuzzle(pz: { id: string; theme: string; rating: number }, 
       delta = p.puzzleRating - before;
       p.puzzleCount++;
     }
-    p.attempts.push({ id: pz.id, theme: pz.theme, correct, hints, date: Date.now(), source });
+    p.attempts.push({ id: pz.id, theme: pz.theme, correct, hints, date: Date.now(), source, ...(pz.op ? { op: pz.op } : {}) });
     if (p.attempts.length > 400) p.attempts.splice(0, p.attempts.length - 400);
     // repaso espaciado
     const r = p.review[pz.id];
@@ -201,6 +201,25 @@ export function skills(p: Progress): { theme: string; pct: number; n: number }[]
     const last = list.slice(-20);
     return { theme, pct: Math.round(100 * last.filter(a => a.correct && a.hints === 0).length / last.length), n: list.length };
   }).filter(s => s.n >= 5).sort((a, b) => a.pct - b.pct);
+}
+
+/** Aciertos por tema en los últimos 20 intentos de cada uno (incluye los temas con pocos intentos). */
+export function themeProgress(p: Progress): { theme: string; pct: number; n: number }[] {
+  const by: Record<string, Attempt[]> = {};
+  for (const a of p.attempts) (by[a.theme] ??= []).push(a);
+  return Object.entries(by).map(([theme, list]) => {
+    const last = list.slice(-20);
+    return { theme, pct: Math.round(100 * last.filter(a => a.correct && a.hints === 0).length / last.length), n: list.length };
+  }).sort((a, b) => b.n - a.n);
+}
+/** Lo mismo por apertura (problemas de tácticas que ocurren en esa apertura). */
+export function openingProgress(p: Progress): { op: string; pct: number; n: number }[] {
+  const by: Record<string, Attempt[]> = {};
+  for (const a of p.attempts) if (a.op) (by[a.op] ??= []).push(a);
+  return Object.entries(by).map(([op, list]) => {
+    const last = list.slice(-20);
+    return { op, pct: Math.round(100 * last.filter(a => a.correct && a.hints === 0).length / last.length), n: list.length };
+  }).sort((a, b) => b.n - a.n);
 }
 
 /* ---------- partidas ---------- */

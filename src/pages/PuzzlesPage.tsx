@@ -1,7 +1,7 @@
 /* Problemas: rating propio, temas, problema del día y sesión de resolución. */
 import { useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { dailyPuzzle, difficultyLabel, LEVELS, pickPuzzle, puzzleById, PUZZLES, THEMES, themeLabel, todayKey, unseenCount, type Puzzle } from '../problems/bank.ts';
+import { dailyPuzzle, difficultyLabel, LEVELS, MAIN_OPENINGS, openingLabel, pickPuzzle, playable, puzzleById, PUZZLES, THEMES, themeLabel, todayKey, unseenCount, useBankReady, type Puzzle } from '../problems/bank.ts';
 import { dueReviews, progressStore, recordPuzzle, skills, today } from '../profile/progress.ts';
 import { useStore } from '../database/store.ts';
 import { MoveExercise, type ExerciseResult } from '../components/MoveExercise.tsx';
@@ -19,6 +19,7 @@ export function MiniBoard({ fen }: { fen: string }) {
 }
 
 export function PuzzlesPage() {
+  const ready = useBankReady();
   const p = useStore(progressStore);
   const nav = useNavigate();
   const daily = dailyPuzzle();
@@ -26,7 +27,12 @@ export function PuzzlesPage() {
   const recent = p.attempts.filter(a => a.source !== 'leccion');
   const acc = recent.length ? Math.round((100 * recent.filter(a => a.correct && a.hints === 0).length) / recent.length) : null;
   const due = dueReviews(p);
-  const counts = useMemo(() => { const c: Record<string, number> = {}; PUZZLES.forEach(z => { c[z.theme] = (c[z.theme] || 0) + 1; }); return c; }, []);
+  const counts = useMemo(() => {
+    const c: Record<string, number> = {};
+    PUZZLES.forEach(z => { for (const t of [z.theme, ...(z.tags ?? [])]) c[t] = (c[t] || 0) + 1; if (z.op) c['op:' + z.op] = (c['op:' + z.op] || 0) + 1; });
+    return c;
+  }, [ready]);
+  const group = (g: string) => Object.entries(THEMES).filter(([k, t]) => t.group === g && counts[k]).sort((a, b) => counts[b[0]] - counts[a[0]]);
   const seenIds = useMemo(() => new Set(p.attempts.map(a => a.id)), [p.attempts]);
   return (
     <div className="page">
@@ -68,10 +74,33 @@ export function PuzzlesPage() {
         </div>
       </section>
 
+      {!ready && <p className="muted small">Cargando el banco completo de problemas…</p>}
       <section className="card-block">
-        <h2>Por tema</h2>
+        <div className="card-h"><h2>Tácticas</h2><span className="muted small">Problemas de partidas reales (Lichess)</span></div>
         <div className="theme-grid">
-          {Object.entries(THEMES).filter(([k]) => counts[k]).map(([k, t]) => (
+          {group('tactica').map(([k, t]) => (
+            <Link key={k} to={`/problema?tema=${k}`} className="theme-card">
+              <strong>{t.label}</strong><span className="muted small">{counts[k] ?? 0} problemas</span>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section className="card-block">
+        <div className="card-h"><h2>Tácticas por apertura</h2><span className="muted small">Trampas y golpes típicos de cada apertura</span></div>
+        <div className="theme-grid">
+          {MAIN_OPENINGS.filter(o => counts['op:' + o]).map(o => (
+            <Link key={o} to={`/problema?apertura=${o}`} className="theme-card">
+              <strong>{openingLabel(o)}</strong><span className="muted small">{counts['op:' + o]} problemas</span>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section className="card-block">
+        <h2>Mates y finales</h2>
+        <div className="theme-grid">
+          {[...group('mate'), ...group('final')].map(([k, t]) => (
             <Link key={k} to={`/problema?tema=${k}`} className="theme-card">
               <strong>{t.label}</strong><span className="muted small">{counts[k] ?? 0} problemas</span>
             </Link>
@@ -85,11 +114,14 @@ export function PuzzlesPage() {
 
 /** Sesión de problemas: ?modo=diario | repaso, ?tema=..., ?id=... */
 export function PuzzlePage() {
+  const ready = useBankReady();
   const [params] = useSearchParams();
   const nav = useNavigate();
   const mode = params.get('modo') as 'diario' | 'repaso' | null;
   const theme = params.get('tema') ?? undefined;
   const level = params.get('nivel') ?? undefined;
+  const opening = params.get('apertura') ?? undefined;
+  const lastTheme = useRef<string | undefined>(undefined);
   const p = useStore(progressStore);
   // todos los problemas que ya intentaste: no se repiten hasta que hayas visto el resto
   const seen = useRef(new Set<string>(p.attempts.map(a => a.id)));
@@ -97,13 +129,20 @@ export function PuzzlePage() {
   const [last, setLast] = useState<{ delta: number; xp: number; solved: boolean } | null>(null);
 
   const puzzle: Puzzle | null = useMemo(() => {
-    if (params.get('id')) return puzzleById(params.get('id')!) ?? null;
-    if (mode === 'diario') return dailyPuzzle();
-    if (mode === 'repaso') { const d = dueReviews(progressStore.get()); return d.length ? puzzleById(d[0].id) ?? null : null; }
-    const weak = skills(progressStore.get()).filter(s => s.pct < 60).map(s => s.theme);
-    return pickPuzzle(progressStore.get().puzzleRating, { theme, level, recent: seen.current, weakThemes: weak });
-  }, [count, mode, theme, level]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!ready) return null;
+    let pz: Puzzle | null | undefined;
+    if (params.get('id')) pz = puzzleById(params.get('id')!);
+    else if (mode === 'diario') pz = dailyPuzzle();
+    else if (mode === 'repaso') { const d = dueReviews(progressStore.get()); pz = d.length ? puzzleById(d[0].id) : null; }
+    else {
+      const weak = skills(progressStore.get()).filter(s => s.pct < 60).map(s => s.theme);
+      pz = pickPuzzle(progressStore.get().puzzleRating, { theme, level, opening, recent: seen.current, weakThemes: weak, lastTheme: lastTheme.current });
+    }
+    if (pz) lastTheme.current = pz.theme;
+    return pz ? playable(pz) : null;
+  }, [count, mode, theme, level, opening, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  if (!ready) return <div className="page narrow"><p className="muted">Cargando problemas…</p></div>;
   if (!puzzle) return (
     <div className="page narrow"><div className="card-lg"><h1>¡Repaso al día!</h1><p className="muted">No tienes problemas pendientes para hoy. Vuelve mañana o resuelve problemas nuevos.</p><Link className="primary" to="/problema">Problemas nuevos</Link></div></div>
   );
@@ -124,7 +163,7 @@ export function PuzzlePage() {
       <div className="lesson-top">
         <button className="icon-btn" aria-label="Volver" onClick={() => nav('/problemas')}><Icon name="back" /></button>
         <div className="puzzle-meta">
-          <strong>{mode === 'diario' ? 'Problema del día' : mode === 'repaso' ? 'Repaso' : theme ? t?.label : level ? `Problemas · ${LEVELS.find(l => l.id === level)?.label ?? ''}` : 'Problemas'}</strong>
+          <strong>{mode === 'diario' ? 'Problema del día' : mode === 'repaso' ? 'Repaso' : theme ? themeLabel(theme) : opening ? openingLabel(opening) : level ? `Problemas · ${LEVELS.find(l => l.id === level)?.label ?? ''}` : 'Problemas'}</strong>
           <span className="muted small">{difficultyLabel(puzzle.rating)} · {puzzle.rating} · tu rating {p.puzzleRating}</span>
         </div>
       </div>
@@ -141,8 +180,8 @@ export function PuzzlePage() {
           <div className="row2"><Link className="primary" to="/problema">Más problemas</Link><Link className="secondary" to="/">Inicio</Link></div>
         </div>
       ) : (
-        <MoveExercise key={puzzle.id + count} fen={puzzle.fen} goal={{ puzzle: puzzle.steps }}
-          prompt={`Juegan ${side}. Encuentra la mejor jugada.${theme || mode ? '' : ''}`}
+        <MoveExercise key={puzzle.id + count} fen={puzzle.preFen ?? puzzle.fen} pre={puzzle.pre} goal={{ puzzle: puzzle.steps }}
+          prompt={`Juegan ${side}. ${puzzle.pre ? 'El rival acaba de jugar: ' : ''}encuentra la mejor jugada.`}
           concept={t?.hint} ok={`¡Correcto! ${t?.label ?? ''}.`} onDone={onDone} continueLabel={mode === 'diario' ? 'Ver resultado' : 'Siguiente problema'} />
       )}
     </div>

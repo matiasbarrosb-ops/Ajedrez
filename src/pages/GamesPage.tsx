@@ -9,11 +9,10 @@ import { ChessBoard } from '../components/ChessBoard.tsx';
 import { FigSan } from '../components/MoveList.tsx';
 import { Icon } from '../components/Icon.tsx';
 import { QualityBadge } from '../components/CoachPanel.tsx';
-import { QUALITY } from '../coach/coach.ts';
+import { QUALITY, qualityAt } from '../coach/coach.ts';
 
-function QMark({ c }: { c?: string }) {
-  if (!c || c === '-' || c === '1') return null;
-  const q = +c;
+function QMark({ q }: { q: number | null }) {
+  if (q === null || q === 1 || q === 2) return null;
   return <span className={`qmark ${QUALITY[q].cls}`} title={QUALITY[q].label}>{QUALITY[q].short}</span>;
 }
 import type { Move } from '../engine/core.ts';
@@ -71,8 +70,8 @@ export function GameViewerPage() {
   for (let i = 0; i < full.hist.length; i += 2) rows.push(
     <div key={i} className="mrow">
       <span className="n">{i / 2 + 1}.</span>
-      <button className={`mv${ply === i + 1 ? ' last' : ''}`} onClick={() => setPly(i + 1)}><FigSan san={full.hist[i].san} /><QMark c={rec.qs?.[i]} /></button>
-      {full.hist[i + 1] ? <button className={`mv${ply === i + 2 ? ' last' : ''}`} onClick={() => setPly(i + 2)}><FigSan san={full.hist[i + 1].san} /><QMark c={rec.qs?.[i + 1]} /></button> : <span />}
+      <button className={`mv${ply === i + 1 ? ' last' : ''}`} onClick={() => setPly(i + 1)}><FigSan san={full.hist[i].san} /><QMark q={qualityAt(rec.qs, i)} /></button>
+      {full.hist[i + 1] ? <button className={`mv${ply === i + 2 ? ' last' : ''}`} onClick={() => setPly(i + 2)}><FigSan san={full.hist[i + 1].san} /><QMark q={qualityAt(rec.qs, i + 1)} /></button> : <span />}
     </div>
   );
   return (
@@ -94,7 +93,7 @@ export function GameViewerPage() {
       </div>
       <aside className="panel">
         <div className="sec"><div className="status">Jugada {Math.ceil(ply / 2)} de {Math.ceil(full.hist.length / 2)}<small>{rec.ratingAfter != null ? `Rating ${rec.ratingBefore} → ${rec.ratingAfter}` : rec.mode === 'local' ? 'Partida en este teléfono' : ''}{rec.acc != null ? ` · Precisión ${rec.acc}%` : ''}</small></div>
-          {ply > 0 && rec.qs?.[ply - 1] && rec.qs[ply - 1] !== '-' && <div><QualityBadge q={+rec.qs[ply - 1]} /></div>}</div>
+          {ply > 0 && qualityAt(rec.qs, ply - 1) !== null && <div><QualityBadge q={qualityAt(rec.qs, ply - 1)!} /></div>}</div>
         <div className="sec"><div className="label">Jugadas</div><div className="moves">{rows}</div></div>
       </aside>
     </div>

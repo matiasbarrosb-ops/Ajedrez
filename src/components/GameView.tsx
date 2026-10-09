@@ -24,22 +24,27 @@ interface Props {
   overlay?: ReactNode;
   footer?: ReactNode;
   coach?: ReactNode;
+  /** comentario corto justo debajo del reloj propio (modo entrenador) */
+  strip?: ReactNode;
+  /** casillas marcadas en el tablero (por ejemplo, la mejor jugada) */
+  hints?: number[];
 }
 
-export function GameView({ P, orientation, players, legalMoves, onMove, hist, status, banner, controls, overlay, footer, coach }: Props) {
+export function GameView({ P, orientation, players, legalMoves, onMove, hist, status, banner, controls, overlay, footer, coach, strip, hints }: Props) {
   const top: Color = orientation === 'w' ? 'b' : 'w';
   const bottom: Color = orientation;
   const last = hist.length ? hist[hist.length - 1].m : null;
   return (
     <div className="game-layout">
-      <div className="play-col">
+      <div className={`play-col${strip ? ' with-strip' : ''}`}>
         <PlayerBar color={top} P={P} {...players[top]} active={P.t === top} />
         <div className="board-holder">
           <ChessBoard P={P} orientation={orientation} legalMoves={legalMoves} onMove={onMove}
-            lastMove={last ? { f: last.f, t: last.t } : null} animKey={hist.length} />
+            lastMove={last ? { f: last.f, t: last.t } : null} animKey={hist.length} hints={hints} />
           {overlay}
         </div>
         <PlayerBar color={bottom} P={P} {...players[bottom]} active={P.t === bottom} />
+        {strip}
       </div>
       <aside className="panel">
         <div className="sec">

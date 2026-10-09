@@ -30,6 +30,8 @@ interface Props {
   onDone: (r: ExerciseResult) => void;
   /** texto del botón al terminar */
   continueLabel?: string;
+  /** jugada previa del rival (UCI) que se muestra como última jugada antes de empezar (problemas de partidas reales) */
+  pre?: string;
 }
 
 const PRAISE = ['¡Muy bien!', '¡Exacto!', '¡Correcto!', '¡Eso es!', '¡Bien visto!'];
@@ -42,8 +44,9 @@ const zoneAround = (sq: number) => {
   return out;
 };
 
-export function MoveExercise({ fen, goal, prompt, concept, ok, wrong, notes, onDone, continueLabel = 'Continuar' }: Props) {
-  const game = useRef(new ChessGame(fen)).current;
+export function MoveExercise({ fen, goal, prompt, concept, ok, wrong, notes, onDone, continueLabel = 'Continuar', pre }: Props) {
+  const game = useRef(new ChessGame(fen, pre ? [pre] : [])).current;
+  const base = pre ? 1 : 0;
   const [version, setVersion] = useState(0);
   const [phase, setPhase] = useState<'play' | 'reply' | 'correct' | 'wrong' | 'failed'>('play');
   const [message, setMessage] = useState<string | null>(null);
@@ -146,7 +149,7 @@ export function MoveExercise({ fen, goal, prompt, concept, ok, wrong, notes, onD
       setUserMoves(n);
       const left = P.b.some(p => p && p !== p.toUpperCase());
       if (!left) { finish(true); if (n > (g.par as number)) setMessage(`¡Listo! Lo hiciste en ${n} jugadas; se puede en ${g.par as number}.`); return; }
-      if (n >= (g.par as number) + 4) { fail('Demasiadas jugadas. Empecemos de nuevo.'); game.undo(game.hist.length); setUserMoves(0); bump(); return; }
+      if (n >= (g.par as number) + 4) { fail('Demasiadas jugadas. Empecemos de nuevo.'); game.undo(game.hist.length - base); setUserMoves(0); bump(); return; }
       // las negras no mueven: vuelve el turno a las blancas
       P.t = 'w'; P.ep = -1; game.legal = legal(P); bump();
     } else if ('line' in g) {
@@ -181,7 +184,7 @@ export function MoveExercise({ fen, goal, prompt, concept, ok, wrong, notes, onD
   const resetAll = useRef(false);
 
   const retry = () => {
-    if (resetAll.current) { resetAll.current = false; game.undo(game.hist.length); setLineIdx(0); setUserMoves(0); bump(); }
+    if (resetAll.current) { resetAll.current = false; game.undo(game.hist.length - base); setLineIdx(0); setUserMoves(0); bump(); }
     setMessage(null); setPhase('play');
   };
   const showSolution = async () => {

@@ -8,12 +8,18 @@ import { Icon } from '../components/Icon.tsx';
 import { useState } from 'react';
 import { local } from '../lib/storage.ts';
 
-const LEVELS: Level[] = ['Principiante', 'Intermedio', 'Avanzado'];
+const LEVELS: Level[] = ['Tácticas', 'Aperturas', 'Principiante', 'Intermedio', 'Avanzado'];
+/** en Tácticas y Aperturas todas las lecciones están abiertas: eliges el tema que quieras practicar */
+const FREE: Level[] = ['Tácticas', 'Aperturas'];
+const INTRO: Partial<Record<Level, string>> = {
+  'Tácticas': 'Cada lección enseña una táctica y te da 5 problemas de partidas reales, de más fácil a más difícil.',
+  'Aperturas': 'Las tácticas y trampas típicas de cada apertura, con problemas de partidas que empezaron así.'
+};
 
 export function LearnPage() {
   const p = useStore(progressStore);
-  const [level, setLevel] = useState<Level>(local.get<Level>('jm-learn-level', 'Principiante'));
-  const pick = (l: Level) => { setLevel(l); local.set('jm-learn-level', l); };
+  const [level, setLevel] = useState<Level>(() => { const l = local.get<Level>('jm-learn-level2', 'Tácticas'); return LEVELS.includes(l) ? l : 'Tácticas'; });
+  const pick = (l: Level) => { setLevel(l); local.set('jm-learn-level2', l); };
   const units = UNITS.filter(u => u.level === level);
   const all = units.flatMap(u => u.lessons);
   const doneCount = all.filter(l => p.lessons[l.id]).length;
@@ -35,6 +41,7 @@ export function LearnPage() {
         })}
       </div>
       <div className="level-progress"><div style={{ width: `${(100 * doneCount) / Math.max(1, all.length)}%` }} /></div>
+      {INTRO[level] && <p className="muted small">{INTRO[level]}</p>}
 
       {units.map(u => (
         <section key={u.id} className="unit">
@@ -45,7 +52,7 @@ export function LearnPage() {
             {u.lessons.map(l => {
               const idx = all.findIndex(x => x.id === l.id);
               const done = p.lessons[l.id];
-              const open = done || idx === firstOpen || firstOpen === -1;
+              const open = FREE.includes(level) || done || idx === firstOpen || firstOpen === -1;
               const current = idx === firstOpen;
               const offset = [0, 1, 2, 1, 0, -1, -2, -1][idx % 8];
               return (

@@ -11,7 +11,9 @@ import { bumpRecord } from '../database/online.ts';
 import { recordGame, updateGame } from '../profile/progress.ts';
 import { settingsStore } from '../database/session.ts';
 import { useCoach, qualityString } from '../coach/useCoach.ts';
-import { CoachPanel } from '../components/CoachPanel.tsx';
+import { CoachPanel, CoachStrip } from '../components/CoachPanel.tsx';
+import { sanToSpeech, speechForNote } from '../coach/coach.ts';
+import { speak, stopSpeaking, voiceSupported } from '../lib/voice.ts';
 import { REASON_TEXT as RT } from '../chess/game.ts';
 import { loadSavedLocal as loadSaved } from '../hooks/useLocalGame.ts';
 
@@ -35,7 +37,34 @@ function LocalGame({ onRestart }: { onRestart: () => void }) {
   const recId = useRef<string | null>(null);
   const settings = useStore(settingsStore);
   const sides: Color[] = cfg.mode === 'bot' ? [cfg.human] : ['w', 'b'];
-  const coach = useCoach(game, g.version, sides, settings.coach);
+  // modo entrenador: comentarios bajo el reloj y con voz. Modo Bots: sin comentarios (se analiza en silencio para tus estadísticas).
+  const coachMode = cfg.mode === 'bot' && !!cfg.coach;
+  const coach = useCoach(game, g.version, sides, cfg.mode === 'bot' ? true : settings.coach);
+  const [showBest, setShowBest] = useState(false);
+  const spoken = useRef(new Set<string>());
+  // para la franja: tu última jugada calificada y, si es posterior, la última del rival
+  const lastMine = [...coach.msgs].reverse().find(m => m.kind === 'move');
+  const lastOpp = [...coach.msgs].reverse().find(m => m.kind === 'opp');
+  const mineNote = lastMine?.kind === 'move' ? lastMine.note : null;
+  const oppNote = lastOpp?.kind === 'opp' && (!mineNote || lastOpp.ply > mineNote.ply) ? lastOpp.note : null;
+  useEffect(() => { setShowBest(false); }, [g.version, mineNote?.ply]);
+  // voz: cada comentario nuevo se lee una vez (solo los recientes, no los de jugadas viejas)
+  useEffect(() => {
+    if (!coachMode || !settings.voice) return;
+    for (const m of coach.msgs) {
+      const key = `${m.kind}${m.ply}${m.note.san}`;
+      if (spoken.current.has(key)) continue;
+      spoken.current.add(key);
+      if (m.ply < game.hist.length - 2) continue;
+      if (m.kind === 'move') speak(speechForNote(m.note));
+      else {
+        const l = m.note.lines.find(x => !/^No hay amenazas|^Desarrolló|^Enrocó/.test(x));
+        if (l) speak(`El rival juega ${sanToSpeech(m.note.san)}. ${l}`);
+      }
+    }
+  }, [coach.msgs, coachMode, settings.voice]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => stopSpeaking(), []);
+  const bestHints = showBest && mineNote?.bestMove ? [mineNote.bestMove.f, mineNote.bestMove.t] : undefined;
 
   const baseOrientation: Color = cfg.mode === 'bot' ? cfg.human : 'w';
   const orientation: Color = flip ? (baseOrientation === 'w' ? 'b' : 'w') : baseOrientation;
@@ -57,7 +86,7 @@ function LocalGame({ onRestart }: { onRestart: () => void }) {
     }
     if (!recorded.current && cfg.mode === 'bot' && user && game.hist.length >= 2) {
       const res = !result.winner ? 'd' : result.winner === cfg.human ? 'w' : 'l';
-      void bumpRecord(user.uid, `~bot${cfg.botId}`, `${g.bot.name} · ${g.bot.rating}`, res);
+      void bumpRecord(user.uid, `~bot${g.bot.id}`, `${g.bot.name} · ${g.bot.rating}`, res);
     }
     recorded.current = true;
   }, [result]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -110,8 +139,11 @@ function LocalGame({ onRestart }: { onRestart: () => void }) {
           primary={{ label: cfg.mode === 'bot' ? 'Revancha (colores cambiados)' : 'Otra partida', onClick: again }}
           onMenu={() => nav('/jugar')} onClose={() => setOverSeen(true)} />
       ) : null}
-      coach={<CoachPanel msgs={coach.msgs} busy={coach.busy} accuracy={coach.accuracy} notes={coach.notes} showSide={cfg.mode === 'local'}
-        enabled={settings.coach} onToggle={() => settingsStore.set(s => ({ ...s, coach: !s.coach }))} />}
+      coach={cfg.mode === 'local' || coachMode ? <CoachPanel msgs={coach.msgs} busy={coach.busy} accuracy={coach.accuracy} notes={coach.notes} showSide={cfg.mode === 'local'}
+        enabled={coachMode || settings.coach} onToggle={coachMode ? undefined : () => settingsStore.set(s => ({ ...s, coach: !s.coach }))} /> : undefined}
+      strip={coachMode ? <CoachStrip mine={mineNote} opp={oppNote} busy={coach.busy} showBest={showBest} onShowBest={() => setShowBest(v => !v)}
+        voiceOn={settings.voice} onVoice={() => { if (settings.voice) stopSpeaking(); settingsStore.set(s => ({ ...s, voice: !s.voice })); }} voiceAvailable={voiceSupported()} /> : undefined}
+      hints={bestHints}
       footer={<button className="btn-ghost" onClick={() => nav('/jugar')}>Volver a Jugar</button>}
     />
   );

@@ -9,6 +9,8 @@ export interface Settings {
   sound: boolean;
   evalBar: boolean;
   coach: boolean;
+  /** el entrenador lee sus comentarios en voz alta */
+  voice: boolean;
 }
 
 export interface Onboarding {
@@ -22,7 +24,7 @@ export const sessionStore = createStore<{ user: User | null; firebase: 'cargando
   firebase: 'cargando'
 });
 
-export const settingsStore = createStore<Settings>({ sound: true, evalBar: true, coach: true, ...local.get<Partial<Settings>>('jm-settings', {}) });
+export const settingsStore = createStore<Settings>({ sound: true, evalBar: true, coach: true, voice: true, ...local.get<Partial<Settings>>('jm-settings', {}) });
 settingsStore.subscribe(() => { local.set('jm-settings', settingsStore.get()); setSoundEnabled(settingsStore.get().sound); });
 setSoundEnabled(settingsStore.get().sound);
 

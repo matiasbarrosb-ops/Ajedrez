@@ -94,6 +94,7 @@ export function ProfilePage() {
         <h2>Ajustes</h2>
         <div className="settings">
           <label className="switch"><span>Sonido</span><input type="checkbox" checked={settings.sound} onChange={() => toggle('sound')} /></label>
+          <label className="switch"><span>Voz del entrenador</span><input type="checkbox" checked={settings.voice} onChange={() => toggle('voice')} /></label>
           <button className="link left" onClick={() => { onboardingStore.set({ done: false }); nav('/bienvenida'); }}>Volver a responder la bienvenida</button>
         </div>
       </section>

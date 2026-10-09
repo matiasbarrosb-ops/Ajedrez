@@ -2,7 +2,7 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { lessonById, ALL_LESSONS, type Step } from '../lessons/data.ts';
-import { puzzleById, THEMES } from '../problems/bank.ts';
+import { playable, puzzleById, THEMES, useBankReady } from '../problems/bank.ts';
 import { completeLesson, recordPuzzle } from '../profile/progress.ts';
 import { ChessBoard } from '../components/ChessBoard.tsx';
 import { MoveExercise, type ExerciseResult } from '../components/MoveExercise.tsx';
@@ -72,14 +72,19 @@ export function LessonPage() {
 function StepView({ step, onNext, onExercise }: { step: Step; onNext: () => void; onExercise: (r: ExerciseResult, pz?: { id: string; theme: string; rating: number }) => void }) {
   if (step.t === 'info') return <InfoView step={step} onNext={onNext} />;
   if (step.t === 'quiz') return <QuizView step={step} onNext={onNext} />;
-  if (step.t === 'puzzle') {
-    const pz = puzzleById(step.id);
-    if (!pz) return <button className="primary" onClick={onNext}>Continuar</button>;
-    const side = pz.fen.split(' ')[1] === 'w' ? 'blancas' : 'negras';
-    return <MoveExercise fen={pz.fen} goal={{ puzzle: pz.steps }} prompt={step.text ?? `Juegan ${side}. ${THEMES[pz.theme]?.label ?? ''}: encuentra la mejor jugada.`}
-      concept={THEMES[pz.theme]?.hint} onDone={r => onExercise(r, pz)} />;
-  }
+  if (step.t === 'puzzle') return <PuzzleStep step={step} onNext={onNext} onExercise={onExercise} />;
   return <MoveExercise fen={step.fen} goal={step.goal} prompt={step.text} concept={step.hint} ok={step.ok} wrong={step.wrong} notes={step.notes} onDone={r => onExercise(r)} />;
+}
+
+function PuzzleStep({ step, onNext, onExercise }: { step: Extract<Step, { t: 'puzzle' }>; onNext: () => void; onExercise: (r: ExerciseResult, pz?: { id: string; theme: string; rating: number }) => void }) {
+  const ready = useBankReady();
+  const raw = puzzleById(step.id);
+  if (!raw) return ready || !step.id.startsWith('l') ? <button className="primary" onClick={onNext}>Continuar</button> : <p className="muted">Cargando el ejercicio…</p>;
+  const pz = playable(raw);
+  const side = pz.fen.split(' ')[1] === 'w' ? 'blancas' : 'negras';
+  return <MoveExercise key={pz.id} fen={pz.preFen ?? pz.fen} pre={pz.pre} goal={{ puzzle: pz.steps }}
+    prompt={step.text ?? `Juegan ${side}. ${pz.pre ? 'El rival acaba de jugar. ' : ''}${THEMES[pz.theme]?.label ?? ''}: encuentra la mejor jugada.`}
+    concept={THEMES[pz.theme]?.hint} onDone={r => onExercise(r, pz)} />;
 }
 
 function InfoView({ step, onNext }: { step: Extract<Step, { t: 'info' }>; onNext: () => void }) {

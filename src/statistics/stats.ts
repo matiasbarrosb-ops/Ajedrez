@@ -1,4 +1,5 @@
 /* Estadísticas de todas tus partidas y jugadas, calculadas a partir del historial guardado. */
+import { qualityAt } from '../coach/coach.ts';
 import { CK, CQ } from '../engine/core.ts';
 import { ChessGame } from '../chess/game.ts';
 import { START_FEN } from '../chess/notation.ts';
@@ -40,7 +41,7 @@ export function computeStats(games: GameRecord[]): Stats {
   const s: Stats = {
     total: wld(), byColor: { w: wld(), b: wld() }, byOpponent: [], byReason: [], myMoves: 0,
     pieces: { P: 0, N: 0, B: 0, R: 0, Q: 0, K: 0 }, captures: 0, checks: 0, promotions: 0, castled: { short: 0, long: 0, never: 0 },
-    avgLength: 0, avgDurationMin: 0, longest: 0, quality: [0, 0, 0, 0, 0], analyzedMoves: 0, accuracyAvg: null, accuracySeries: [],
+    avgLength: 0, avgDurationMin: 0, longest: 0, quality: [0, 0, 0, 0, 0, 0], analyzedMoves: 0, accuracyAvg: null, accuracySeries: [],
     openingsWhite: [], openingsBlack: [], form: [], bestStreak: 0, perGame: []
   };
   const opp = new Map<string, { name: string; rating?: number; r: Wld }>();
@@ -62,7 +63,7 @@ export function computeStats(games: GameRecord[]): Stats {
     const cg = new ChessGame(START_FEN, g.moves);
     const myParity = g.color === 'w' ? 0 : 1;
     let castle: 'short' | 'long' | null = null, mine = 0;
-    const q = [0, 0, 0, 0, 0];
+    const q = [0, 0, 0, 0, 0, 0];
     cg.hist.forEach((h, i) => {
       if (g.mode !== 'local' && i % 2 !== myParity) return;
       mine++;
@@ -72,8 +73,8 @@ export function computeStats(games: GameRecord[]): Stats {
       if (h.m.pr) s.promotions++;
       if (h.m.fl & CK) castle = 'short';
       if (h.m.fl & CQ) castle = 'long';
-      const c = g.qs?.[i];
-      if (c && c !== '-') { q[+c]++; s.quality[+c]++; s.analyzedMoves++; }
+      const c = qualityAt(g.qs, i);
+      if (c !== null) { q[c]++; s.quality[c]++; s.analyzedMoves++; }
     });
     s.myMoves += mine;
     if (cg.hist.length >= 20) { if (castle) s.castled[castle as 'short' | 'long']++; else s.castled.never++; }

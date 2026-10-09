@@ -14,19 +14,22 @@ import { firebaseConfigured } from '../database/firebase.ts';
 import { cleanCode, createRoom } from '../database/online.ts';
 import { toast } from '../components/Toast.tsx';
 
-interface PlayPrefs { botId: number; color: Color | 'r'; tc: string; customMin: number; customInc: number }
-const DEFAULT: PlayPrefs = { botId: 2, color: 'r', tc: '10+0', customMin: 20, customInc: 0 };
+interface PlayPrefs { botId: number; color: Color | 'r'; tc: string; customMin: number; customInc: number; coach: boolean }
+const DEFAULT: PlayPrefs = { botId: 12, color: 'r', tc: '10+0', customMin: 20, customInc: 0, coach: true };
 
 /** Bot sugerido según lo que respondió en la bienvenida. */
 export function suggestedBot(): number {
   const e = onboardingStore.get().experience;
-  return e === 'nunca' ? 1 : e === 'mover' ? 2 : e === 'aveces' ? 4 : e === 'seguido' ? 5 : e === 'compito' ? 7 : 2;
+  return e === 'nunca' ? 11 : e === 'mover' ? 11 : e === 'aveces' ? 12 : e === 'seguido' ? 13 : e === 'compito' ? 15 : 12;
 }
 
 export function PlayPage() {
   const nav = useNavigate();
   const { user } = useStore(sessionStore);
-  const [prefs, setPrefs] = useState<PlayPrefs>({ ...DEFAULT, botId: suggestedBot(), ...local.get<Partial<PlayPrefs>>('jm-play', {}) });
+  const [prefs, setPrefs] = useState<PlayPrefs>(() => {
+    const p = { ...DEFAULT, botId: suggestedBot(), ...local.get<Partial<PlayPrefs>>('jm-play', {}) };
+    return { ...p, botId: botById(p.botId).id }; // niveles antiguos → nivel nuevo equivalente
+  });
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const saved = loadSavedLocal();
@@ -35,7 +38,7 @@ export function PlayPage() {
   const pickColor = (): Color => (prefs.color === 'r' ? (Math.random() < 0.5 ? 'w' : 'b') : prefs.color);
 
   const startBot = (botId = prefs.botId, tc = tcId) => {
-    startLocalGame({ mode: 'bot', botId, human: pickColor(), tc });
+    startLocalGame({ mode: 'bot', botId, human: pickColor(), tc, coach: prefs.coach });
     nav('/partida');
   };
   const startLocal = () => { startLocalGame({ mode: 'local', botId: prefs.botId, human: 'w', tc: tcId }); nav('/partida'); };
@@ -59,14 +62,23 @@ export function PlayPage() {
 
       <button className="primary hero-btn" onClick={() => startBot(prefs.botId, '10+0')}>
         <Icon name="bolt" /> Partida rápida
-        <small>10 minutos contra {botById(prefs.botId).name} ({botById(prefs.botId).rating})</small>
+        <small>10 minutos contra {botById(prefs.botId).name} ({botById(prefs.botId).rating}){prefs.coach ? ' · con entrenador' : ''}</small>
       </button>
       {saved && !saved.result && saved.moves.length > 0 && (
         <button className="secondary resume" onClick={() => nav('/partida')}>Continuar partida guardada ({saved.moves.length} jugadas)</button>
       )}
 
       <section className="card-block">
-        <h2>Rival</h2>
+        <h2>Modo</h2>
+        <Segmented value={prefs.coach ? 'coach' : 'bots'} onChange={v => update({ coach: v === 'coach' })} label="Modo de juego"
+          options={[{ value: 'coach', label: 'Entrenador' }, { value: 'bots', label: 'Bots' }]} />
+        <p className="muted small">{prefs.coach
+          ? 'Juegas contra el nivel que elijas y el entrenador comenta cada jugada, tuya y del rival, justo bajo tu reloj y en voz alta.'
+          : 'Partida normal contra el bot, sin comentarios. Al final igual queda tu precisión en Estadísticas.'}</p>
+      </section>
+
+      <section className="card-block">
+        <h2>Nivel</h2>
         <div className="bot-grid">
           {BOTS.map(b => (
             <button key={b.id} className={`bot-card${prefs.botId === b.id ? ' on' : ''}`} onClick={() => update({ botId: b.id })} aria-pressed={prefs.botId === b.id}>
@@ -101,7 +113,7 @@ export function PlayPage() {
           <Segmented value={prefs.color} onChange={v => update({ color: v })} label="Color"
             options={[{ value: 'w', label: 'Blancas' }, { value: 'r', label: 'Al azar' }, { value: 'b', label: 'Negras' }]} />
         </div>
-        <button className="primary" onClick={() => startBot()}>Jugar contra {botById(prefs.botId).name}</button>
+        <button className="primary" onClick={() => startBot()}>{prefs.coach ? 'Jugar con entrenador' : 'Jugar'} contra {botById(prefs.botId).name}</button>
       </section>
 
       <section className="card-block">

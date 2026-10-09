@@ -3,6 +3,8 @@ import { E, parseFen, moveCode } from './lib.ts';
 import { UNITS, type MoveStep } from '../src/lessons/data.ts';
 import * as fs from 'node:fs';
 const PUZ = JSON.parse(fs.readFileSync('src/problems/puzzles.json', 'utf8')) as { id: string; theme: string }[];
+// problemas de Lichess (ya verificados al importarlos): [id, fen, pre, sol, ...]
+const LICH = new Set((JSON.parse(fs.readFileSync('src/problems/lichess.json', 'utf8')) as string[][]).map(r => 'l' + r[0]));
 let errors = 0, count = 0;
 const fail = (where: string, msg: string) => { errors++; console.log('FALLA', where, '-', msg); };
 const find = (P: E.Position, c: string) => E.legal(P).find(m => moveCode(m) === c);
@@ -13,7 +15,7 @@ for (const unit of UNITS) for (const lesson of unit.lessons) lesson.steps.forEac
   count++;
   if (st.t === 'puzzle') {
     const m = /^([a-z0-9]+)-(\d+)$/.exec(st.id);
-    const ok = PUZ.some(p => p.id === st.id) || (m && PUZ.filter(p => p.theme === m[1]).length >= Number(m[2]));
+    const ok = LICH.has(st.id) || PUZ.some(p => p.id === st.id) || (m && PUZ.filter(p => p.theme === m[1]).length >= Number(m[2]));
     if (!ok) fail(where, `no existe el problema ${st.id}`);
     return;
   }
