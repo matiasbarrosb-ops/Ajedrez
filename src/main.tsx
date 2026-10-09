@@ -6,6 +6,7 @@ import './styles/components.css';
 import './styles/pages.css';
 import App from './App.tsx';
 import { loadLichess } from './problems/bank.ts';
+import './lib/voice.ts'; // prepara la voz y la desbloquea con el primer toque
 
 createRoot(document.getElementById('root')!).render(<StrictMode><App /></StrictMode>);
 // el banco grande de problemas se baja en segundo plano apenas abre la app

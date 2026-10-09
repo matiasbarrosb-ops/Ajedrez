@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Color, RootScore } from '../engine/core.ts';
 import { coachEngine } from '../engine/client.ts';
 import { ChessGame } from '../chess/game.ts';
+import { START_FEN } from '../chess/notation.ts';
 import { judgeMove, opponentNote, accuracy, type CoachNote, type OpponentNote } from './coach.ts';
 
 export type CoachMsg =
@@ -57,7 +58,7 @@ export function useCoach(game: ChessGame, version: number, sides: Color[], activ
         const m = g.find({ f: game.hist[i]?.m.f ?? -1, t: game.hist[i]?.m.t ?? -1, pr: game.hist[i]?.m.pr ?? null });
         if (!m || game.codes.slice(0, i + 1).join(',') !== key) { pending.current.delete(key); return; }
         const msg: CoachMsg = mine
-          ? { kind: 'move', ply: i, note: judgeMove(g.P, m, a.list, i) }
+          ? { kind: 'move', ply: i, note: judgeMove(g.P, m, a.list, i, game.startFen === START_FEN ? codes.slice(0, i + 1) : undefined) }
           : { kind: 'opp', ply: i, note: opponentNote(g.P, m, i, a.list) };
         setMsgs(ms => ms.some(x => x.ply === i) ? ms : [...ms, msg].sort((x, y) => x.ply - y.ply));
       }).finally(() => { inFlight.current--; setBusy(inFlight.current > 0); });

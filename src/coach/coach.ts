@@ -4,13 +4,14 @@
  */
 import { attacked, gen, inCheck, legal, make, MATE, other, unmake, CK, CQ, type Color, type Move, type Position, type RootScore } from '../engine/core.ts';
 import { sameMove, sqName, toSan } from '../chess/notation.ts';
+import { isTheory, openingLine } from './openings.ts';
 
 export type Quality = 0 | 1 | 2 | 3 | 4 | 5;
 
 export const QUALITY: { label: string; short: string; cls: string; desc: string; say: string }[] = [
   { label: 'Mejor', short: '★', cls: 'q0', desc: 'La jugada que eligió el motor. Solo esa cuenta como la mejor.', say: 'La mejor jugada' },
-  { label: 'Excelente', short: '!', cls: 'q1', desc: 'Casi igual de buena que la mejor (pierdes 2 puntos o menos de probabilidad de ganar).', say: 'Excelente' },
-  { label: 'Buena', short: '✓', cls: 'q2', desc: 'Sólida, pero había algo más preciso (hasta 5 puntos).', say: 'Buena jugada' },
+  { label: 'Excelente', short: '!', cls: 'q1', desc: 'Una de las mejores opciones, casi sin diferencia con la mejor (pierdes 1 punto o menos de probabilidad de ganar).', say: 'Excelente' },
+  { label: 'Buena', short: '✓', cls: 'q2', desc: 'Una jugada normal: cumple, pero había algo más preciso (hasta 5 puntos).', say: 'Buena jugada' },
   { label: 'Imprecisión', short: '?!', cls: 'q3', desc: 'No es grave, pero había algo claramente mejor (hasta 10 puntos).', say: 'Imprecisión' },
   { label: 'Error', short: '?', cls: 'q4', desc: 'Empeora bastante tu posición (hasta 18 puntos).', say: 'Error' },
   { label: 'Error grave', short: '??', cls: 'q5', desc: 'Pierde material importante, la partida o un mate.', say: 'Error grave' }
@@ -42,6 +43,8 @@ export interface CoachNote {
   bestWhy?: string;
   /** pérdida de probabilidad de ganar (0-100) para calcular precisión */
   loss: number;
+  /** frase sobre la apertura, cuando cambia de nombre ("Respondiste con la Defensa Francesa.") */
+  opening?: string;
 }
 
 const NAME: Record<string, string> = { P: 'peón', N: 'caballo', B: 'alfil', R: 'torre', Q: 'dama', K: 'rey' };
@@ -103,6 +106,11 @@ interface Features { lines: string[]; tags: Set<string> }
 function describe(P: Position, m: Move, side: Color): Features {
   const lines: string[] = [], tags = new Set<string>();
   const beforeHang = hanging(P, side);
+  // qué piezas propias estaban defendidas y cuáles atacadas antes de mover
+  const own: number[] = [];
+  for (let i = 0; i < 64; i++) { const p = P.b[i]; if (p && colorOfPiece(p) === side && T(p) !== 'K' && i !== m.f) own.push(i); }
+  const defBefore = new Map(own.map(i => [i, attacked(P, i, side)]));
+  const attBefore = new Map(own.map(i => [i, attackers(P, i, other(side)).length > 0]));
   const fullmove = P.f;
   const piece = m.p;
   const u = make(P, m);
@@ -141,6 +149,20 @@ function describe(P: Position, m: Move, side: Color): Features {
     if (ignored.length && !m.c) { lines.push(`No atiendes la amenaza sobre ${tu(P.b[ignored[0]]!)} en ${sqName(ignored[0])}.`); tags.add('ignored'); }
     else if (beforeHang.includes(m.f) && !afterHang.includes(m.t)) { lines.push(`Salvas ${tu(piece)}, que estaba amenazad${FEM[T(piece)] ? 'a' : 'o'}.`); tags.add('saved'); }
     else if (beforeHang.length && !afterHang.some(s => beforeHang.includes(s)) && !m.c) { lines.push('Defiendes la pieza que estaba amenazada.'); tags.add('saved'); }
+    // protección: piezas que ahora cuidas y piezas que dejaste de cuidar
+    if (!(m.fl & (CK | CQ))) {
+      for (const s of own) {
+        const p = P.b[s];
+        if (!p || colorOfPiece(p) !== side || s === m.t) continue;
+        const dNow = attacked(P, s, side);
+        if (!defBefore.get(s) && dNow && attBefore.get(s) && !tags.has('saved')) { lines.push(`Cuidas y proteges ${tu(p)} de ${sqName(s)}, que estaba atacad${FEM[T(p)] ? 'a' : 'o'}.`); tags.add('guard'); break; }
+      }
+      for (const s of own) {
+        const p = P.b[s];
+        if (!p || colorOfPiece(p) !== side || s === m.t || afterHang.includes(s)) continue;
+        if (defBefore.get(s) && !attacked(P, s, side) && (VAL[T(p)] >= 3 || attackers(P, s, other(side)).length > 0)) { lines.push(`Ojo: ${tu(p)} de ${sqName(s)} quedó sin defensa.`); tags.add('loose'); break; }
+      }
+    }
   } finally {
     unmake(P, m, u);
   }
@@ -149,7 +171,7 @@ function describe(P: Position, m: Move, side: Color): Features {
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /** Califica una jugada. `list` = evaluación de todas las jugadas de la posición anterior (de analyzeRoot). */
-export function judgeMove(P: Position, m: Move, list: RootScore[], ply: number): CoachNote {
+export function judgeMove(P: Position, m: Move, list: RootScore[], ply: number, codes?: string[]): CoachNote {
   const side = P.t;
   const legalMoves = legal(P);
   const san = toSan(P, m, legalMoves);
@@ -157,8 +179,11 @@ export function judgeMove(P: Position, m: Move, list: RootScore[], ply: number):
   const mine = list.find(x => sameMove(m, x.move));
   const bestS = best?.score ?? 0, myS = mine?.score ?? bestS;
   const loss = Math.max(0, winPct(bestS) - winPct(myS));
-  const isBest = !!best && (sameMove(m, best.move) || myS >= bestS);
-  let q: Quality = isBest ? 0 : loss <= 2 ? 1 : loss <= 5 ? 2 : loss <= 10 ? 3 : loss <= 18 ? 4 : 5;
+  // criterio exigente: "Mejor" solo si es la jugada del motor (o una que puntúa más); "Excelente" solo si está entre
+  // las 3 primeras y casi no pierde nada. Una jugada normal, que no empeora pero tampoco es de las mejores, es "Buena".
+  const isBest = !!best && (sameMove(m, best.move) || myS > bestS);
+  const rank = list.findIndex(x => sameMove(m, x.move));
+  let q: Quality = isBest ? 0 : loss <= 1 && rank >= 0 && rank <= 2 ? 1 : loss <= 5 ? 2 : loss <= 10 ? 3 : loss <= 18 ? 4 : 5;
 
   const f = describe(P, m, side);
   const why = f.lines.slice();
@@ -224,8 +249,18 @@ export function judgeMove(P: Position, m: Move, list: RootScore[], ply: number):
     why.sort((a, b) => Number(bad.test(b)) - Number(bad.test(a)));
   }
   if (!why.length) why.push(q <= 2 ? 'Mejora la ubicación de tus piezas sin crear debilidades.' : 'Es una jugada pasiva: no mejora tu posición.');
+  const opening = codes ? openingLine(codes) ?? undefined : undefined;
+  // jugada de teoría de una apertura conocida: el motor rápido a veces prefiere otra, pero es correcta
+  if (codes && isTheory(codes) && q >= 1 && q <= 3) {
+    q = 1;
+    const filler = why.indexOf('Mejora la ubicación de tus piezas sin crear debilidades.');
+    if (filler >= 0) why.splice(filler, 1);
+    why.unshift('Es una jugada de teoría: así se juega esta apertura.');
+    bestSan = undefined; bestMove = undefined; bestWhy = undefined;
+    if (/Antes de mover|Compara siempre/.test(tip)) tip = 'Buen principio de apertura: centro, desarrollo y enroque.';
+  }
 
-  return { ply, side, san, q, why, tip, best: bestSan, bestMove, bestWhy, loss };
+  return { ply, side, san, q, why, tip, best: bestSan, bestMove, bestWhy, loss, opening };
 }
 
 /** Aviso después de la jugada del rival: qué te amenaza ahora y si dejó algo colgado. */
@@ -305,11 +340,21 @@ export function sanToSpeech(san: string): string {
   return out;
 }
 
-/** Frase corta para leer en voz alta después de tu jugada. */
+const VERDICT: string[][] = [
+  ['¡Bien ahí! Es la mejor jugada.', '¡Exacto! Es justo lo que había que jugar.'],
+  ['Muy bien, excelente jugada.', 'Excelente, casi lo mejor.'],
+  ['Jugada normal: cumple, pero había algo más preciso.', 'Correcta, sin más.'],
+  ['Imprecisa: pierdes un poco de terreno.', 'No es lo mejor, regalas algo de ventaja.'],
+  ['Mal ahí, es un error.', 'Error: esto empeora bastante tu posición.'],
+  ['¡Mal ahí! Error grave.', '¡Cuidado! Esto es un error grave.']
+];
+
+/** Lo que el entrenador dice en voz alta después de tu jugada: qué jugaste, qué tan buena fue, la apertura, por qué y qué era mejor. */
 export function speechForNote(n: CoachNote): string {
-  const parts = [`${sanToSpeech(n.san)}: ${QUALITY[n.q].say.toLowerCase()}.`];
-  const reason = n.why.find(w => !/^Según el análisis/.test(w)) ?? n.why[0];
-  if (reason) parts.push(reason);
-  if (n.q >= 3 && n.best) parts.push(`Era mejor ${sanToSpeech(n.best)}.`);
+  const parts = [`Jugaste ${sanToSpeech(n.san)}.`, VERDICT[n.q][n.ply % 2 ? 1 : 0]];
+  if (n.opening) parts.push(n.opening);
+  const reasons = n.why.filter(w => !/^Según el análisis|^Das jaque|^¡Es jaque mate/.test(w)).slice(0, 2);
+  parts.push(...reasons);
+  if (n.q >= 2 && n.best) parts.push(`${n.q === 2 ? 'Lo más preciso era' : 'Lo mejor era'} ${sanToSpeech(n.best)}.`);
   return parts.join(' ').replace(/\s+/g, ' ');
 }

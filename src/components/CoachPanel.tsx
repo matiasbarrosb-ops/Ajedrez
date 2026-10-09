@@ -18,7 +18,7 @@ function MoveBubble({ n, sideLabel }: { n: CoachNote; sideLabel?: string }) {
         <span className="cb-move">{sideLabel ? `${sideLabel} · ` : ''}{moveNo(n.ply)} <FigSan san={n.san} /></span>
         <QualityBadge q={n.q} />
       </div>
-      <ul className="cb-why">{n.why.map((w, i) => <li key={i}>{w}</li>)}</ul>
+      <ul className="cb-why">{n.opening && <li>{n.opening}</li>}{n.why.map((w, i) => <li key={i}>{w}</li>)}</ul>
       {n.best && (
         <p className="cb-best"><span className="label">Mejor era</span> <strong><FigSan san={n.best} /></strong>{n.bestWhy ? ` — ${n.bestWhy}` : ''}</p>
       )}
@@ -97,7 +97,7 @@ export function CoachStrip({ mine, opp, busy, showBest, onShowBest, voiceOn, onV
         {mine ? (
           <>
             <p className="cs-head"><QualityBadge q={mine.q} /> <strong><FigSan san={mine.san} /></strong></p>
-            <p className="cs-text">{reason}{mine.q >= 2 && mine.best ? <> Mejor era <strong><FigSan san={mine.best} /></strong>.</> : null}</p>
+            <p className="cs-text">{mine.opening ? `${mine.opening} ` : ''}{reason}{mine.q >= 2 && mine.best ? <> Mejor era <strong><FigSan san={mine.best} /></strong>.</> : null}</p>
           </>
         ) : (
           <p className="cs-text">{busy ? 'Mirando tu jugada…' : 'Haz tu jugada: te digo qué tan buena fue y por qué.'}</p>

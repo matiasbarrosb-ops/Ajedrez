@@ -6,6 +6,7 @@ export const setSoundEnabled = (v: boolean) => { enabled = v; };
 function tone(freq: number, dur: number, type: OscillatorType = 'sine', vol = 0.15, when = 0) {
   try {
     ctx = ctx || new AudioContext();
+    if (ctx.state === 'suspended') void ctx.resume();
     const t = ctx.currentTime + when, o = ctx.createOscillator(), g = ctx.createGain();
     o.type = type; o.frequency.setValueAtTime(freq, t);
     g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0008, t + dur);

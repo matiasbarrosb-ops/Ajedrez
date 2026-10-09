@@ -1,6 +1,6 @@
 /* Partida en este dispositivo: contra un bot o entre dos personas. Se guarda para poder continuarla. */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { other, type Color, type Move } from '../engine/core.ts';
+import { inCheck, other, type Color, type Move } from '../engine/core.ts';
 import { botEngine } from '../engine/client.ts';
 import { botById } from '../engine/bots.ts';
 import { ChessGame, type GameResult } from '../chess/game.ts';
@@ -41,6 +41,18 @@ export function moveSound(m: Move, san: string, over: boolean) {
   else if (m.c) sfx('capture');
   else if (m.fl & 12) sfx('castle');
   else sfx('move');
+}
+
+/**
+ * Cuánto se demora el bot en mover, como una persona: rápido en las primeras jugadas, más en el medio juego
+ * y a veces bastante más. Con reloj, ese tiempo corre en el reloj del bot y nunca pasa de 1/35 de lo que le queda.
+ */
+function botThinkMs(plies: number, legalCount: number, inCheck: boolean, left: number | null): number {
+  const r = Math.random();
+  let ms = plies < 4 ? 900 + r * 900 : plies < 14 ? 1600 + r * 2200 : 2200 + r * 3300 + (Math.random() < 0.15 ? 2500 : 0);
+  if (inCheck || legalCount <= 3) ms *= 0.55;
+  if (left !== null) ms = Math.min(ms, Math.max(300, left / 35));
+  return ms;
 }
 
 export function useLocalGame() {
@@ -85,6 +97,7 @@ export function useLocalGame() {
     const my = ++token.current;
     setThinking(true);
     const t0 = Date.now();
+    const want = botThinkMs(game.hist.length, game.legal.length, inCheck(game.P, game.turn), clockRef.current ? clockRef.current[game.turn] : null);
     const opts = { ...bot.opts };
     if (game.hist.length < 8 && opts.n < 20) opts.n += 14; // algo de variedad en la apertura
     if (clockRef.current) opts.ms = Math.min(opts.ms, Math.max(150, clockRef.current[game.turn] / 30));
@@ -95,7 +108,7 @@ export function useLocalGame() {
         if (!r) return;
         const m = game.find(r.move);
         if (m) play(m);
-      }, Math.max(0, 420 - (Date.now() - t0)));
+      }, Math.max(0, want - (Date.now() - t0)));
     });
     return () => { token.current++; setThinking(false); };
   }, [version, result]); // eslint-disable-line react-hooks/exhaustive-deps
