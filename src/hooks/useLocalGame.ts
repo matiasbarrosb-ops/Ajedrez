@@ -55,7 +55,8 @@ function botThinkMs(plies: number, legalCount: number, inCheck: boolean, left: n
   return ms;
 }
 
-export function useLocalGame() {
+/** hold: mientras sea true el bot no mueve y su reloj no corre (el entrenador está hablando o esperando tu decisión). */
+export function useLocalGame(hold?: { current: boolean }) {
   const saved = useRef(loadSavedLocal()).current;
   const cfg: LocalConfig = saved ?? { mode: 'bot', botId: 3, human: 'w', tc: 'none' };
   const tc = timeControlById(cfg.tc);
@@ -65,6 +66,7 @@ export function useLocalGame() {
   const [thinking, setThinking] = useState(false);
   const [version, setVersion] = useState(0);
   const [, setTick] = useState(0);
+  const [nudge, setNudge] = useState(0);
   const token = useRef(0);
   const lastTick = useRef(performance.now());
   const resultRef = useRef(result);
@@ -93,7 +95,7 @@ export function useLocalGame() {
 
   // turno del bot
   useEffect(() => {
-    if (result || !isBotTurn()) return;
+    if (result || !isBotTurn() || hold?.current) return;
     const my = ++token.current;
     setThinking(true);
     const t0 = Date.now();
@@ -111,7 +113,7 @@ export function useLocalGame() {
       }, Math.max(0, want - (Date.now() - t0)));
     });
     return () => { token.current++; setThinking(false); };
-  }, [version, result]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [version, result, nudge]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // reloj
   useEffect(() => {
@@ -120,7 +122,7 @@ export function useLocalGame() {
       const now = performance.now(), dt = now - lastTick.current;
       lastTick.current = now;
       const c = clockRef.current!;
-      if (resultRef.current || !gameRef.current.hist.length) return;
+      if (resultRef.current || !gameRef.current.hist.length || hold?.current) return;
       const side = gameRef.current.turn;
       c[side] -= dt;
       if (c[side] <= 0) {
@@ -159,5 +161,7 @@ export function useLocalGame() {
   };
 
   const humanCanMove = !result && !thinking && (cfg.mode === 'local' || game.turn === cfg.human);
-  return { cfg, tc, bot, game, version, result, thinking, clock: clockRef.current, humanCanMove, play, undo, resign, agreeDraw };
+  /** vuelve a revisar si le toca al bot (después de soltar hold) */
+  const kick = useCallback(() => setNudge(x => x + 1), []);
+  return { kick, cfg, tc, bot, game, version, result, thinking, clock: clockRef.current, humanCanMove, play, undo, resign, agreeDraw };
 }

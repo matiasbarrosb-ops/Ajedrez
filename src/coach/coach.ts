@@ -45,6 +45,19 @@ export interface CoachNote {
   loss: number;
   /** frase sobre la apertura, cuando cambia de nombre ("Respondiste con la Defensa Francesa.") */
   opening?: string;
+  /** jugada de teoría (libro de aperturas) */
+  book?: boolean;
+  /** rasgos de la jugada (capturas, desarrollo, amenazas…) para las frases del entrenador */
+  tags?: string[];
+  /** pieza capturada (si la hubo) */
+  captured?: string | null;
+  /** pieza movida y casilla de destino */
+  piece?: string;
+  to?: number;
+  /** mejor respuesta del rival después de tu jugada (se completa en jugadas malas) */
+  threat?: { f: number; t: number; c?: string | null; mate?: boolean; check?: boolean };
+  /** la mejor jugada capturaba esto (pieza rival) */
+  bestCaptures?: string | null;
 }
 
 const NAME: Record<string, string> = { P: 'peón', N: 'caballo', B: 'alfil', R: 'torre', Q: 'dama', K: 'rey' };
@@ -251,7 +264,8 @@ export function judgeMove(P: Position, m: Move, list: RootScore[], ply: number, 
   if (!why.length) why.push(q <= 2 ? 'Mejora la ubicación de tus piezas sin crear debilidades.' : 'Es una jugada pasiva: no mejora tu posición.');
   const opening = codes ? openingLine(codes) ?? undefined : undefined;
   // jugada de teoría de una apertura conocida: el motor rápido a veces prefiere otra, pero es correcta
-  if (codes && isTheory(codes) && q >= 1 && q <= 3) {
+  const book = !!codes && isTheory(codes);
+  if (book && q >= 1 && q <= 3) {
     q = 1;
     const filler = why.indexOf('Mejora la ubicación de tus piezas sin crear debilidades.');
     if (filler >= 0) why.splice(filler, 1);
@@ -260,7 +274,8 @@ export function judgeMove(P: Position, m: Move, list: RootScore[], ply: number, 
     if (/Antes de mover|Compara siempre/.test(tip)) tip = 'Buen principio de apertura: centro, desarrollo y enroque.';
   }
 
-  return { ply, side, san, q, why, tip, best: bestSan, bestMove, bestWhy, loss, opening };
+  const bm = best ? legalMoves.find(x => sameMove(x, best.move)) : undefined;
+  return { ply, side, san, q, why, tip, best: bestSan, bestMove, bestWhy, loss, opening, book, tags: [...f.tags], piece: m.pr || m.p, to: m.t, captured: m.c ?? null, bestCaptures: bm && !(bm.f === m.f && bm.t === m.t) ? bm.c : null };
 }
 
 /** Aviso después de la jugada del rival: qué te amenaza ahora y si dejó algo colgado. */

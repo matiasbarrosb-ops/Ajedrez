@@ -8,7 +8,18 @@ import { inCheck, isWhite, type Color, type Move, type Position } from '../engin
 import { FILES } from '../chess/notation.ts';
 import { glyph } from './pieces.ts';
 
-export interface BoardArrow { f: number; t: number }
+export interface BoardArrow { f: number; t: number; tone?: 'good' | 'bad' }
+/** Ícono sobre una casilla: cómo estuvo la jugada (libro, mejor, buena, error…). */
+export type BadgeKind = 'book' | 'best' | 'excellent' | 'good' | 'inaccuracy' | 'mistake' | 'blunder';
+export interface BoardBadge { sq: number; kind: BadgeKind }
+
+function BadgeIcon({ kind }: { kind: BadgeKind }) {
+  if (kind === 'book') return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5C5.5 5 8.5 5 12 7c3.5-2 6.5-2 9-.5V19c-2.5-1.5-5.5-1.5-9 .5-3.5-2-6.5-2-9-.5z" fill="#fff" /><path d="M12 7v12.5" stroke="#a5713f" strokeWidth="1.6" /></svg>;
+  if (kind === 'good') return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10.5V20H4v-9.5zM9 20h8.2a2 2 0 0 0 2-1.7l1.1-6A2 2 0 0 0 18.3 10H14V6.2A2.2 2.2 0 0 0 11.8 4L9 10.4z" fill="#fff" /></svg>;
+  if (kind === 'best') return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" fill="#fff" /></svg>;
+  const txt = kind === 'excellent' ? '!' : kind === 'inaccuracy' ? '?!' : kind === 'mistake' ? '?' : '??';
+  return <span>{txt}</span>;
+}
 
 interface Props {
   P: Position;
@@ -27,9 +38,13 @@ interface Props {
   showMovesFrom?: number | null;
   showMoves?: Move[];
   coordinates?: boolean;
+  /** ícono de calidad sobre una casilla (modo entrenador) */
+  badge?: BoardBadge | null;
+  /** flechas (verde: mejor jugada; roja: amenaza del rival) */
+  arrows?: BoardArrow[];
 }
 
-export function ChessBoard({ P, orientation, legalMoves, onMove, lastMove, animKey, hints, marks, showMovesFrom, showMoves, coordinates = true }: Props) {
+export function ChessBoard({ P, orientation, legalMoves, onMove, lastMove, animKey, hints, marks, showMovesFrom, showMoves, coordinates = true, badge, arrows }: Props) {
   const boardRef = useRef<HTMLDivElement>(null);
   const [sel, setSel] = useState<number | null>(null);
   const [promo, setPromo] = useState<Move[] | null>(null);
@@ -145,6 +160,7 @@ export function ChessBoard({ P, orientation, legalMoves, onMove, lastMove, animK
         {coordinates && (i & 7) === 0 && <span className="co rk">{8 - r}</span>}
         {coordinates && i >> 3 === 7 && <span className="co fl">{FILES[f]}</span>}
         {p && <span className={`pc ${isWhite(p) ? 'w' : 'b'}`}>{glyph(p.toUpperCase())}</span>}
+        {badge && badge.sq === sq && <span className={`qicon ${badge.kind}`} key={`${badge.kind}${animKey}`}><BadgeIcon kind={badge.kind} /></span>}
       </div>
     );
   }
@@ -155,6 +171,19 @@ export function ChessBoard({ P, orientation, legalMoves, onMove, lastMove, animK
         onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={() => endDrag()}>
         {squares}
       </div>
+      {arrows && arrows.length > 0 && (
+        <svg className="arrows" viewBox="0 0 8 8" aria-hidden="true">
+          {arrows.map((a, i) => {
+            const c = (s: number) => { const k = flipped ? 63 - s : s; return [(k & 7) + 0.5, (k >> 3) + 0.5]; };
+            const [x1, y1] = c(a.f), [x2, y2] = c(a.t);
+            const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy) || 1;
+            const ux = dx / L, uy = dy / L, nx = -uy, ny = ux, hw = 0.12, hl = 0.42, hh = 0.3;
+            const sx = x1 + ux * 0.2, sy = y1 + uy * 0.2, bx = x2 - ux * hl, by = y2 - uy * hl;
+            const pts = [[sx + nx * hw, sy + ny * hw], [bx + nx * hw, by + ny * hw], [bx + nx * hh, by + ny * hh], [x2, y2], [bx - nx * hh, by - ny * hh], [bx - nx * hw, by - ny * hw], [sx - nx * hw, sy - ny * hw]];
+            return <polygon key={i} className={a.tone === 'bad' ? 'bad' : 'good'} points={pts.map(p => p.map(v => v.toFixed(3)).join(',')).join(' ')} />;
+          })}
+        </svg>
+      )}
       {promo && (
         <div className="overlay" onClick={() => setPromo(null)}>
           <div className="card promo-card" onClick={e => e.stopPropagation()}>

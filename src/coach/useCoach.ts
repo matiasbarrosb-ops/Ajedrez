@@ -1,6 +1,6 @@
 /* Conecta el entrenador con una partida: analiza en segundo plano y arma los mensajes del chat. */
 import { useEffect, useRef, useState } from 'react';
-import type { Color, RootScore } from '../engine/core.ts';
+import { inCheck, legal, make, MATE, unmake, type Color, type RootScore } from '../engine/core.ts';
 import { coachEngine } from '../engine/client.ts';
 import { ChessGame } from '../chess/game.ts';
 import { START_FEN } from '../chess/notation.ts';
@@ -20,6 +20,8 @@ const DEPTH = 5, MS = 1200;
 export function useCoach(game: ChessGame, version: number, sides: Color[], active: boolean) {
   const [msgs, setMsgs] = useState<CoachMsg[]>([]);
   const [busy, setBusy] = useState(false);
+  /** evaluación (centipeones, a favor de blancas) de cada posición, por jugadas */
+  const [evals, setEvals] = useState<Record<string, number>>({});
   const cache = useRef(new Map<string, Promise<{ list: RootScore[] }>>());
   const pending = useRef(new Set<string>());
   const inFlight = useRef(0);
@@ -31,6 +33,13 @@ export function useCoach(game: ChessGame, version: number, sides: Color[], activ
       const g = new ChessGame(game.startFen, codes);
       pr = coachEngine().analyze(g.P, DEPTH, MS);
       cache.current.set(key, pr);
+      const white = g.turn === 'w';
+      void pr.then(a => {
+        let v: number;
+        if (a.list.length) v = a.list[0].score;
+        else v = inCheck(g.P, g.turn) ? -MATE : 0; // sin jugadas: mate o ahogado
+        setEvals(e => ({ ...e, [key]: white ? v : -v }));
+      });
     }
     return pr;
   };
@@ -57,10 +66,25 @@ export function useCoach(game: ChessGame, version: number, sides: Color[], activ
         const g = new ChessGame(game.startFen, prefix);
         const m = g.find({ f: game.hist[i]?.m.f ?? -1, t: game.hist[i]?.m.t ?? -1, pr: game.hist[i]?.m.pr ?? null });
         if (!m || game.codes.slice(0, i + 1).join(',') !== key) { pending.current.delete(key); return; }
-        const msg: CoachMsg = mine
-          ? { kind: 'move', ply: i, note: judgeMove(g.P, m, a.list, i, game.startFen === START_FEN ? codes.slice(0, i + 1) : undefined) }
-          : { kind: 'opp', ply: i, note: opponentNote(g.P, m, i, a.list) };
-        setMsgs(ms => ms.some(x => x.ply === i) ? ms : [...ms, msg].sort((x, y) => x.ply - y.ply));
+        const add = (msg: CoachMsg) => setMsgs(ms => ms.some(x => x.ply === i) ? ms : [...ms, msg].sort((x, y) => x.ply - y.ply));
+        if (!mine) { add({ kind: 'opp', ply: i, note: opponentNote(g.P, m, i, a.list) }); return; }
+        const note = judgeMove(g.P, m, a.list, i, game.startFen === START_FEN ? codes.slice(0, i + 1) : undefined);
+        if (note.q < 4) { add({ kind: 'move', ply: i, note }); return; }
+        // jugada mala: se busca la mejor respuesta del rival para mostrarla ("ahora puedo capturar tu peón")
+        return analysisFor(codes.slice(0, i + 1)).then(b => {
+          const r = b.list[0];
+          if (r) {
+            const after = new ChessGame(game.startFen, codes.slice(0, i + 1));
+            const rm = legal(after.P).find(x => x.f === r.move.f && x.t === r.move.t && (x.pr ?? null) === (r.move.pr ?? null));
+            if (rm) {
+              const u = make(after.P, rm);
+              const check = inCheck(after.P, after.P.t);
+              unmake(after.P, rm, u);
+              note.threat = { f: rm.f, t: rm.t, c: rm.c, check, mate: r.score > MATE - 1000 };
+            }
+          }
+          add({ kind: 'move', ply: i, note });
+        });
       }).finally(() => { inFlight.current--; setBusy(inFlight.current > 0); });
     }
     // adelanta el análisis de la posición actual
@@ -69,7 +93,13 @@ export function useCoach(game: ChessGame, version: number, sides: Color[], activ
 
   const notes = msgs.filter((m): m is Extract<CoachMsg, { kind: 'move' }> => m.kind === 'move').map(m => m.note);
   const latest = msgs.length ? msgs[msgs.length - 1] : null;
-  return { msgs, notes, latest, busy, accuracy: accuracy(notes.map(n => n.loss)) };
+  // la evaluación más reciente que se conozca (hasta la jugada actual)
+  let evalNow: number | null = null;
+  for (let k = game.codes.length; k >= 0; k--) {
+    const v = evals[game.codes.slice(0, k).join(',')];
+    if (v !== undefined) { evalNow = v; break; }
+  }
+  return { msgs, notes, latest, busy, evalNow, accuracy: accuracy(notes.map(n => n.loss)) };
 }
 
 /** Calidades por medio-movimiento para guardar con la partida ('~' = escala de 6 niveles, '-' = sin analizar). */

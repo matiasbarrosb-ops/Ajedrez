@@ -2,7 +2,7 @@
 import type { ReactNode } from 'react';
 import type { Color, Move, Position } from '../engine/core.ts';
 import type { HistoryEntry } from '../chess/game.ts';
-import { ChessBoard } from './ChessBoard.tsx';
+import { ChessBoard, type BoardArrow, type BoardBadge } from './ChessBoard.tsx';
 import { PlayerBar } from './PlayerBar.tsx';
 import { MoveList } from './MoveList.tsx';
 import { Icon, type IconName } from './Icon.tsx';
@@ -28,19 +28,24 @@ interface Props {
   strip?: ReactNode;
   /** casillas marcadas en el tablero (por ejemplo, la mejor jugada) */
   hints?: number[];
+  /** entrenador que conversa arriba del tablero (modo entrenador) */
+  talk?: ReactNode;
+  badge?: BoardBadge | null;
+  arrows?: BoardArrow[];
 }
 
-export function GameView({ P, orientation, players, legalMoves, onMove, hist, status, banner, controls, overlay, footer, coach, strip, hints }: Props) {
+export function GameView({ P, orientation, players, legalMoves, onMove, hist, status, banner, controls, overlay, footer, coach, strip, hints, talk, badge, arrows }: Props) {
   const top: Color = orientation === 'w' ? 'b' : 'w';
   const bottom: Color = orientation;
   const last = hist.length ? hist[hist.length - 1].m : null;
   return (
     <div className="game-layout">
-      <div className={`play-col${strip ? ' with-strip' : ''}`}>
+      <div className={`play-col${strip ? ' with-strip' : ''}${talk ? ' with-talk' : ''}`}>
+        {talk}
         <PlayerBar color={top} P={P} {...players[top]} active={P.t === top} />
         <div className="board-holder">
           <ChessBoard P={P} orientation={orientation} legalMoves={legalMoves} onMove={onMove}
-            lastMove={last ? { f: last.f, t: last.t } : null} animKey={hist.length} hints={hints} />
+            lastMove={last ? { f: last.f, t: last.t } : null} animKey={hist.length} hints={hints} badge={badge} arrows={arrows} />
           {overlay}
         </div>
         <PlayerBar color={bottom} P={P} {...players[bottom]} active={P.t === bottom} />

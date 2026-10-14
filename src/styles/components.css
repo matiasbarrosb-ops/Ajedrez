@@ -152,3 +152,52 @@
 .cs-opp { margin: 4px 0 0; padding-top: 4px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
 .cs-opp span { font-weight: 600; color: var(--fg); }
 .cs-opp.slip span { color: var(--gold); }
+
+/* ---------- modo entrenador: conversación arriba del tablero ---------- */
+.talk { display: flex; flex-direction: column; gap: 8px; }
+.talk-top { display: flex; align-items: center; gap: 8px; }
+.evalh { position: relative; flex: 1; height: 22px; border-radius: 5px; background: #3a3936; overflow: hidden; }
+.evalh-fill { position: absolute; inset: 0 auto 0 0; background: #f4f4ef; transition: width .45s cubic-bezier(.3, .7, .4, 1); }
+.evalh-num { position: absolute; top: 50%; transform: translateY(-50%); font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.evalh-num.w { left: 8px; color: #262622; }
+.evalh-num.b { right: 8px; color: #f4f4ef; }
+.talk-row { display: flex; align-items: flex-end; gap: 10px; min-height: 76px; }
+.coach-face { position: relative; width: 56px; height: 56px; border-radius: 50%; flex: none; display: grid; place-items: center; background: var(--accent); box-shadow: 0 0 0 3px var(--panel); transition: background .25s; }
+.coach-face.neutral { background: #9fb37f; }
+.coach-face.sly { background: var(--q4); }
+.coach-face.worried { background: var(--gold); }
+.cf-knight { font-family: var(--f-pc); font-size: 34px; line-height: 1; color: #18200f; transform: translateY(-2px); }
+.cf-mouth { position: absolute; bottom: 9px; left: 50%; width: 14px; height: 7px; margin-left: -7px; border: 2.5px solid #18200f; border-top: 0; border-radius: 0 0 10px 10px; transition: transform .25s; }
+.coach-face.neutral .cf-mouth { height: 0; border-radius: 0; border-width: 2.5px 0 0; }
+.coach-face.sly .cf-mouth { transform: rotate(-12deg); }
+.coach-face.worried .cf-mouth { transform: rotate(180deg); bottom: 6px; }
+.talk-bubbles { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.tb { position: relative; margin: 0; background: #fbfbf7; color: #1f221c; border-radius: 14px; padding: 10px 14px; font-size: 15.5px; line-height: 1.35; box-shadow: 0 2px 8px rgba(0, 0, 0, .25); animation: tb-in .22s ease-out; }
+.tb:last-child::before { content: ""; position: absolute; left: -7px; bottom: 14px; border: 8px solid transparent; border-left: 0; border-right-color: #fbfbf7; }
+.tb strong { font-weight: 700; }
+.tb .fig { color: inherit; }
+.tb.typing { display: inline-flex; gap: 5px; width: max-content; padding: 14px 16px; }
+.tb.typing span { width: 7px; height: 7px; border-radius: 50%; background: #8d9284; animation: tb-dot 1s infinite ease-in-out; }
+.tb.typing span:nth-child(2) { animation-delay: .15s; } .tb.typing span:nth-child(3) { animation-delay: .3s; }
+@keyframes tb-in { from { opacity: 0; transform: translateY(6px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes tb-dot { 0%, 80%, 100% { opacity: .3; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
+.talk-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: center; }
+.talk-acts > .link { grid-column: 1 / -1; justify-self: center; }
+.talk-acts:has(> .link:only-child) { display: flex; justify-content: center; }
+.talk-acts .btn-ghost, .talk-acts .primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px; font-size: 17px; }
+.play-col.with-talk { gap: 6px; }
+@media (min-width: 900px) {
+  .play-col.with-talk { width: min(calc(100vw - 220px - 32px - 336px), max(360px, calc(100vh - 290px)), 720px); }
+}
+
+/* ícono de calidad sobre la pieza (como un sello) */
+.qicon { position: absolute; top: 1%; right: 1%; width: 36%; height: 36%; border-radius: 50%; display: grid; place-items: center; z-index: 7; pointer-events: none; color: #fff; font-weight: 800; font-family: var(--f-ui); font-size: calc(100cqw / 8 * .2); line-height: 1; box-shadow: 0 1px 3px rgba(0, 0, 0, .45); animation: qi-pop .3s cubic-bezier(.3, 1.6, .5, 1); }
+.qicon svg { width: 62%; height: 62%; }
+.qicon.book { background: #a5713f; } .qicon.best { background: #5c9e31; } .qicon.excellent { background: #5c9e31; }
+.qicon.good { background: #74a83f; } .qicon.inaccuracy { background: var(--q3); } .qicon.mistake { background: var(--q4); } .qicon.blunder { background: var(--q5); }
+@keyframes qi-pop { from { transform: scale(.2); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* flechas sobre el tablero */
+.arrows { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 6; }
+.arrows polygon.good { fill: rgba(110, 175, 60, .85); }
+.arrows polygon.bad { fill: rgba(226, 86, 63, .85); }

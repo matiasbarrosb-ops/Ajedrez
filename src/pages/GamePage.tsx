@@ -1,5 +1,5 @@
 /* Partida contra un bot o entre dos personas en este teléfono. */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import type { Color, Move } from '../engine/core.ts';
 import { REASON_TEXT } from '../chess/game.ts';
@@ -11,9 +11,15 @@ import { bumpRecord } from '../database/online.ts';
 import { recordGame, updateGame } from '../profile/progress.ts';
 import { settingsStore } from '../database/session.ts';
 import { useCoach, qualityString } from '../coach/useCoach.ts';
-import { CoachPanel, CoachStrip } from '../components/CoachPanel.tsx';
-import { sanToSpeech, speechForNote } from '../coach/coach.ts';
-import { speak, stopSpeaking, voiceSupported } from '../lib/voice.ts';
+import { CoachPanel } from '../components/CoachPanel.tsx';
+import type { CoachNote } from '../coach/coach.ts';
+import { botLine, mistakeLine, reactToMove, toSpeech, type Mood } from '../coach/talk.ts';
+import { CoachTalk, type Bubble } from '../components/CoachTalk.tsx';
+import type { BadgeKind, BoardArrow } from '../components/ChessBoard.tsx';
+import { ChessGame } from '../chess/game.ts';
+import { START_FEN } from '../chess/notation.ts';
+import { Icon } from '../components/Icon.tsx';
+import { speak, stopSpeaking } from '../lib/voice.ts';
 import { REASON_TEXT as RT } from '../chess/game.ts';
 import { loadSavedLocal as loadSaved } from '../hooks/useLocalGame.ts';
 
@@ -28,7 +34,9 @@ export function GamePage() {
 function LocalGame({ onRestart }: { onRestart: () => void }) {
   const nav = useNavigate();
   const { user } = useStore(sessionStore);
-  const g = useLocalGame();
+  // el entrenador puede frenar al bot mientras comenta tu jugada o espera que decidas
+  const holdRef = useRef(false);
+  const g = useLocalGame(holdRef);
   const { cfg, game, result, thinking, clock, humanCanMove } = g;
   const [flip, setFlip] = useState(false);
   const [overSeen, setOverSeen] = useState(!!result);
@@ -37,34 +45,116 @@ function LocalGame({ onRestart }: { onRestart: () => void }) {
   const recId = useRef<string | null>(null);
   const settings = useStore(settingsStore);
   const sides: Color[] = cfg.mode === 'bot' ? [cfg.human] : ['w', 'b'];
-  // modo entrenador: comentarios bajo el reloj y con voz. Modo Bots: sin comentarios (se analiza en silencio para tus estadísticas).
+  // modo entrenador: el entrenador conversa arriba del tablero y habla en voz alta. Modo Bots: sin comentarios (se analiza en silencio para tus estadísticas).
   const coachMode = cfg.mode === 'bot' && !!cfg.coach;
   const coach = useCoach(game, g.version, sides, cfg.mode === 'bot' ? true : settings.coach);
   const [showBest, setShowBest] = useState(false);
-  const spoken = useRef(new Set<string>());
   // para la franja: tu última jugada calificada y, si es posterior, la última del rival
   const lastMine = [...coach.msgs].reverse().find(m => m.kind === 'move');
-  const lastOpp = [...coach.msgs].reverse().find(m => m.kind === 'opp');
   const mineNote = lastMine?.kind === 'move' ? lastMine.note : null;
-  const oppNote = lastOpp?.kind === 'opp' && (!mineNote || lastOpp.ply > mineNote.ply) ? lastOpp.note : null;
   useEffect(() => { setShowBest(false); }, [g.version, mineNote?.ply]);
-  // voz: cada comentario nuevo se lee una vez (solo los recientes, no los de jugadas viejas)
-  useEffect(() => {
-    if (!coachMode || !settings.voice) return;
-    for (const m of coach.msgs) {
-      const key = `${m.kind}${m.ply}${m.note.san}`;
-      if (spoken.current.has(key)) continue;
-      spoken.current.add(key);
-      if (m.ply < game.hist.length - 2) continue;
-      if (m.kind === 'move') speak(speechForNote(m.note));
-      else {
-        const l = m.note.lines.find(x => !/^No hay amenazas|^Desarrolló|^Enrocó/.test(x));
-        if (l) speak(`El rival juega ${sanToSpeech(m.note.san)}. ${l}`);
-      }
-    }
-  }, [coach.msgs, coachMode, settings.voice]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => stopSpeaking(), []);
-  const bestHints = showBest && mineNote?.bestMove ? [mineNote.bestMove.f, mineNote.bestMove.t] : undefined;
+
+  /* ---------- modo entrenador: conversación, pausas, íconos y flechas ---------- */
+  const n = game.hist.length;
+  const botTurn = cfg.mode === 'bot' && game.turn !== cfg.human;
+  const lastIsMine = coachMode && n > 0 && botTurn;           // la última jugada fue tuya y el bot aún no responde
+  const myPly = lastIsMine ? n - 1 : n >= 2 && coachMode ? n - 2 : -1; // tu última jugada en el tablero
+  const myNote: CoachNote | undefined = coach.notes.find(x => x.ply === myPly);
+  const [continued, setContinued] = useState<Set<number>>(new Set());
+  const [timedOut, setTimedOut] = useState<number>(-1);
+  const waiting = lastIsMine && !result && !myNote && timedOut !== n - 1;
+  const paused = lastIsMine && !result && !!myNote && myNote.q >= 4 && !continued.has(myNote.ply);
+  const shouldHold = waiting || paused;
+  const wasHeld = useRef(false);
+  useLayoutEffect(() => {
+    holdRef.current = shouldHold;
+    if (wasHeld.current && !shouldHold) g.kick();
+    wasHeld.current = shouldHold;
+  });
+  // si el análisis se demora demasiado, el bot juega igual
+  useEffect(() => {
+    if (!waiting) return;
+    const t = setTimeout(() => setTimedOut(n - 1), 5000);
+    return () => clearTimeout(t);
+  }, [waiting, n]);
+
+  const [bubbles, setBubbles] = useState<Bubble[]>([]);
+  const [mood, setMood] = useState<Mood>('happy');
+  const talked = useRef(new Set<string>());
+  const prevThreat = useRef(false);
+  // al deshacer o reintentar, se olvidan los comentarios y pausas de las jugadas borradas
+  useEffect(() => {
+    for (const k of [...talked.current]) if (+(/\d+/.exec(k)?.[0] ?? 0) >= n) talked.current.delete(k);
+    setContinued(c => (Array.from(c).some(p => p >= n) ? new Set(Array.from(c).filter(p => p < n)) : c));
+  }, [n]);
+  const say = (text: string, m: Mood, replace: boolean) => {
+    const b = { id: `${Date.now()}-${Math.random()}`, text };
+    setBubbles(bs => (replace ? [b] : [...bs, b].slice(-2)));
+    setMood(m);
+    if (settings.voice && settings.sound) speak(toSpeech(text));
+  };
+  // tu jugada calificada → el entrenador reacciona (o te frena si fue un error)
+  useEffect(() => {
+    if (!coachMode || !myNote) return;
+    const key = `me${myNote.ply}:${game.codes.slice(0, myNote.ply + 1).join(',')}`;
+    if (talked.current.has(key) || myNote.ply < n - 2) return;
+    talked.current.add(key);
+    if (myNote.q >= 4) {
+      const after = new ChessGame(START_FEN, game.codes.slice(0, myNote.ply + 1));
+      const l = mistakeLine(myNote, after.P);
+      say(l.text, l.mood, true);
+    } else {
+      const prev = myNote.ply > 0 ? game.hist[myNote.ply - 1] : null;
+      const l = reactToMove(myNote, prevThreat.current, prev?.m.c ? prev.m.t : null);
+      say(l.text, l.mood, true);
+    }
+  }, [myNote, coachMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  // la jugada del bot → dice lo que hace
+  useEffect(() => {
+    if (!coachMode || !n || botTurn) return;
+    const last = game.hist[n - 1];
+    const key = `bot${n - 1}:${game.codes.join(',')}`;
+    if (talked.current.has(key)) return;
+    talked.current.add(key);
+    const before = new ChessGame(START_FEN, game.codes.slice(0, n - 1));
+    const l = botLine(before.P, last.m, game.codes);
+    prevThreat.current = l.threat;
+    // si tu jugada anterior ya tiene comentario, el del bot va debajo; si no, lo reemplaza
+    say(l.text, l.mood, n === 1 || !coach.notes.some(x => x.ply === n - 2));
+  }, [g.version, coachMode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const retry = () => {
+    stopSpeaking();
+    g.undo();
+    setBubbles([{ id: `retry${Date.now()}`, text: '¡Dale! Busca una jugada mejor.' }]);
+    setMood('happy');
+  };
+  const goOn = () => {
+    if (!myNote) return;
+    setContinued(c => new Set(c).add(myNote.ply));
+    setShowBest(false);
+  };
+  const KIND: BadgeKind[] = ['best', 'excellent', 'good', 'inaccuracy', 'mistake', 'blunder'];
+  const badge = coachMode && myNote && myNote.to !== undefined && myNote.ply === myPly
+    ? { sq: myNote.to, kind: myNote.book && myNote.q <= 1 ? 'book' as const : KIND[myNote.q] }
+    : null;
+  const arrows: BoardArrow[] = [];
+  if (coachMode && paused && myNote?.threat) arrows.push({ f: myNote.threat.f, t: myNote.threat.t, tone: 'bad' });
+  if (coachMode && showBest && myNote?.bestMove && myNote.ply === myPly) arrows.push({ ...myNote.bestMove, tone: 'good' });
+  const talkActions = coachMode && !result ? (
+    paused ? (
+      <>
+        <button className="btn-ghost" onClick={goOn}><Icon name="play" size={18} />Continuar</button>
+        <button className="primary sm" onClick={retry}><Icon name="undo" size={18} />Reintentar</button>
+        {myNote?.best && <button className="link" onClick={() => setShowBest(v => !v)}>{showBest ? 'Ocultar mejor' : 'Ver mejor'}</button>}
+      </>
+    ) : myNote && myNote.q >= 2 && myNote.best && myNote.ply === myPly ? (
+      <button className="link" onClick={() => setShowBest(v => !v)}>{showBest ? 'Ocultar mejor jugada' : 'Ver mejor jugada'}</button>
+    ) : null
+  ) : null;
+
+  const bestHints = !coachMode && showBest && mineNote?.bestMove ? [mineNote.bestMove.f, mineNote.bestMove.t] : undefined;
 
   const baseOrientation: Color = cfg.mode === 'bot' ? cfg.human : 'w';
   const orientation: Color = flip ? (baseOrientation === 'w' ? 'b' : 'w') : baseOrientation;
@@ -107,7 +197,9 @@ function LocalGame({ onRestart }: { onRestart: () => void }) {
   let status;
   if (result) {
     status = <>{titleFor(result.winner, cfg)}<small>{REASON_TEXT[result.reason]} · {scoreFor(result.winner)}</small></>;
-  } else if (thinking) {
+  } else if (paused) {
+    status = <>Revisa tu jugada<small>Reintenta o continúa la partida.</small></>;
+  } else if (thinking || waiting) {
     status = <>{g.bot.name} está pensando…<small>{g.bot.blurb}</small></>;
   } else {
     const turn = cfg.mode === 'bot' ? 'Tu turno' : game.turn === 'w' ? 'Juegan blancas' : 'Juegan negras';
@@ -116,7 +208,7 @@ function LocalGame({ onRestart }: { onRestart: () => void }) {
 
   const resignArmed = Date.now() - armedResign < 3000;
   const controls: Control[] = [
-    { id: 'undo', icon: 'undo', label: 'Deshacer', onClick: g.undo, disabled: !game.hist.length },
+    { id: 'undo', icon: 'undo', label: 'Deshacer', onClick: () => { stopSpeaking(); g.undo(); if (coachMode) setBubbles([]); }, disabled: !game.hist.length },
     { id: 'flip', icon: 'flip', label: 'Girar', onClick: () => setFlip(f => !f) },
     ...(cfg.mode === 'local' ? [{ id: 'draw', icon: 'draw' as const, label: 'Tablas', onClick: g.agreeDraw, disabled: !!result }] : []),
     {
@@ -141,9 +233,8 @@ function LocalGame({ onRestart }: { onRestart: () => void }) {
       ) : null}
       coach={cfg.mode === 'local' || coachMode ? <CoachPanel msgs={coach.msgs} busy={coach.busy} accuracy={coach.accuracy} notes={coach.notes} showSide={cfg.mode === 'local'}
         enabled={coachMode || settings.coach} onToggle={coachMode ? undefined : () => settingsStore.set(s => ({ ...s, coach: !s.coach }))} /> : undefined}
-      strip={coachMode ? <CoachStrip mine={mineNote} opp={oppNote} busy={coach.busy} showBest={showBest} onShowBest={() => setShowBest(v => !v)}
-        voiceOn={settings.voice} onVoice={() => { if (settings.voice) stopSpeaking(); settingsStore.set(s => ({ ...s, voice: !s.voice })); }} voiceAvailable={voiceSupported()} /> : undefined}
-      hints={bestHints}
+      talk={coachMode ? <CoachTalk cp={coach.evalNow} bubbles={bubbles} mood={mood} thinking={waiting || (thinking && !paused)} actions={talkActions} /> : undefined}
+      hints={bestHints} badge={badge} arrows={arrows}
       footer={<button className="btn-ghost" onClick={() => nav('/jugar')}>Volver a Jugar</button>}
     />
   );
