@@ -11,7 +11,7 @@ Etapas 1, 2, 5, 6 y 7 listas (de 9). Faltan la barra de evaluación, el tutor en
 
 - Navegación: Inicio, Jugar, Aprender, Entrenar, Problemas, Partidas, Perfil (barra inferior en celular, lateral en computador).
 - Bienvenida con dos preguntas que arman el plan inicial.
-- Jugar: modo **Entrenador** (comenta cada jugada tuya y del rival justo bajo tu reloj, y la lee en voz alta) o modo **Bots** (sin comentarios). 5 niveles: Novato, Básico, Intermedio, Avanzado y Experto (comprobados con `node tools/bot-match.ts`). Ritmos 1+0 a 15+10 y personalizado, dos personas en el mismo teléfono, amigo online por código.
+- Jugar: modo **Entrenador** (el entrenador es tu rival y conversa contigo arriba del tablero, en voz alta: reacciona a tu jugada, cuenta lo que hace, marca cada jugada con un ícono, muestra la barra de ventaja y, si te equivocas, detiene la partida con una flecha y te deja Reintentar o Continuar) o modo **Bots** (sin comentarios). 5 niveles: Novato, Básico, Intermedio, Avanzado y Experto (comprobados con `node tools/bot-match.ts`). Ritmos 1+0 a 15+10 y personalizado, dos personas en el mismo teléfono, amigo online por código.
 - Tablero: tocar o arrastrar, jugadas legales, última jugada, jaque, coronación, enroque, captura al paso, tablas por repetición/50 jugadas/material, reloj con incremento.
 - Cuentas con nombre + PIN y marcador por rival.
 - Aprender: Tácticas (66 lecciones: ataque doble, clavada, ensartada, descubierta, desviación…) y Aperturas (40 lecciones con las trampas típicas de cada una), además de 58 lecciones de Principiante, Intermedio y Avanzado.
